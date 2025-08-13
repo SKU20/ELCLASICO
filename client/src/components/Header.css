@@ -424,7 +424,7 @@
 
 .cart-wrapper {
   position: relative;
-  cursor: pointer; /* Make entire cart clickable */
+  cursor: pointer;
 }
 
 .cart-badge {
