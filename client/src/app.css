@@ -1,0 +1,45 @@
+/* App.css - Add these styles to your main CSS file */
+
+.app {
+  min-height: 100vh;
+  background: #f9fafb;
+}
+
+/* Main content wrapper that contains everything except header */
+.main-content {
+  transition: filter 0.3s ease, opacity 0.3s ease;
+}
+
+/* Blur effect when search is active */
+.main-content.blur-active {
+  filter: blur(4px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Blur overlay */
+.blur-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  backdrop-filter: blur(2px);
+  transition: opacity 0.3s ease;
+}
+
+/* Make sure header stays above the blur overlay */
+.header {
+  position: relative;
+  z-index: 15;
+}
+
+/* Optional: Enhance search input when active */
+.search input.search-active {
+  box-shadow: 0 0 15px rgba(0, 123, 255, 0.3);
+  border-color: #007bff;
+  z-index: 20;
+  position: relative;
+}
