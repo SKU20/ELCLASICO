@@ -8,10 +8,25 @@ import { createClient } from '@supabase/supabase-js';
 // Load environment variables first
 dotenv.config();
 
-// Create Supabase client directly here
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// ADD THESE NEW ENVIRONMENT VARIABLES:
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
+const NODE_ENV = process.env.NODE_ENV || 'development';
+
+// Log environment info for debugging
+console.log('Environment Configuration:', {
+  NODE_ENV: NODE_ENV,
+  FRONTEND_URL: FRONTEND_URL,
+  BACKEND_URL: BACKEND_URL,
+  SUPABASE_URL: SUPABASE_URL ? 'SET' : 'NOT SET',
+  SUPABASE_ANON_KEY: SUPABASE_ANON_KEY ? 'SET' : 'NOT SET',
+  SUPABASE_SERVICE_ROLE_KEY: SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET'
+});
+
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Missing Supabase environment variables. Please check your .env file.');
   process.exit(1);
@@ -22,6 +37,17 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Admin client (bypasses RLS)
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+// Helper function to get the correct redirect URL
+const getRedirectUrl = (req, provider) => {
+  // Use environment variable if available, otherwise construct from request
+  if (NODE_ENV === 'production' && BACKEND_URL !== 'http://localhost:3000') {
+    return `${BACKEND_URL}/api/auth/callback/${provider}`;
+  }
+  
+  // For development or fallback
+  return `${req.protocol}://${req.get('host')}/api/auth/callback/${provider}`;
+};
 
 // ES6 module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -530,16 +556,6 @@ app.get('/api/auth/user', authenticateUser, async (req, res) => {
     res.status(500).json({ error: 'სერვერის შეცდომა' });
   }
 });
-// Google OAuth initiation route - Server-side flow
-const getRedirectUrl = (req, provider) => {
-  // Use environment variable if available, otherwise construct from request
-  if (process.env.NODE_ENV === 'production' && BACKEND_URL !== 'http://localhost:3000') {
-    return `${BACKEND_URL}/api/auth/callback/${provider}`;
-  }
-  
-  // For development or fallback
-  return `${req.protocol}://${req.get('host')}/api/auth/callback/${provider}`;
-};
 
 // Google OAuth initiation route - Updated
 app.get('/api/auth/google', async (req, res) => {
