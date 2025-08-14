@@ -9,7 +9,7 @@ import MainLayout from './components/MainLayout';
 import ProductPage from './components/ProductPage';
 import UpdatePasswordPage from './components/UpdatePasswordPage';
 import CartPage from './components/CartPage';
-import "./App.css";
+
 
 // Page components with their own header/footer
 const HomePage = ({ allProducts, productsLoading }) => (
