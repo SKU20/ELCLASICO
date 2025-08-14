@@ -1,11 +1,28 @@
-// api.js - Updated with improved size handling
+const getApiBaseUrl = () => {
+  // If we're in production (deployed), use relative URLs or the deployed URL
+  if (typeof window !== 'undefined') {
+    // In browser
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // Development - use localhost
+      return 'http://localhost:3000';
+    } else {
+      // Production - use the same origin (your Render URL)
+      return window.location.origin;
+    }
+  }
+  
+  // Fallback for server-side or other contexts
+  return process.env.VITE_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:3000';
+};
 
-export const API_BASE_URL = 'http://localhost:3000';
+export const API_BASE_URL = getApiBaseUrl();
 
 class ApiService {
   constructor() {
     this.API_BASE_URL = API_BASE_URL;
+    console.log('API Service initialized with URL:', this.API_BASE_URL);
   }
+
 
   // =======================
   // PRODUCT METHODS
