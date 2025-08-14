@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { apiService } from './services/api';
 import { CartProvider } from './contexts/CartContext';
 
@@ -10,6 +10,16 @@ import ProductPage from './components/ProductPage';
 import UpdatePasswordPage from './components/UpdatePasswordPage';
 import CartPage from './components/CartPage';
 import SearchResults from './components/SearchResults';
+
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [pathname]);
+
+  return null;
+};
 
 // Page components with their own header/footer
 const HomePage = ({ allProducts, productsLoading }) => (
@@ -24,8 +34,8 @@ const LoginPage = () => (
   <>
     <Header />
     <div style={{ padding: '2rem', minHeight: '60vh' }}>
-      <h1>Login</h1>
-      <p>Login form goes here...</p>
+      <h1>ავტორიზაცია</h1>
+      <p>მიმდინარეობს მონაცემების შეყვანა...</p>
     </div>
     <Footer />
   </>
@@ -35,8 +45,8 @@ const SignupPage = () => (
   <>
     <Header />
     <div style={{ padding: '2rem', minHeight: '60vh' }}>
-      <h1>Signup</h1>
-      <p>Signup form goes here...</p>
+      <h1>ავტორიზაცია</h1>
+      <p>მიმდინარეობს მონაცემების შეყვანა...</p>
     </div>
     <Footer />
   </>
@@ -164,6 +174,7 @@ const AppContent = () => {
 const App = () => (
   <CartProvider>
     <Router>
+      <ScrollToTop />
       <AppContent />
     </Router>
   </CartProvider>

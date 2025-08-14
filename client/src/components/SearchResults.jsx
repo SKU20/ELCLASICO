@@ -31,144 +31,172 @@ const SearchResults = ({ allProducts = [] }) => {
   // Get unique brands from search results
   const availableBrands = [...new Set(searchResults.filter(p => p.brand).map(p => p.brand))].sort();
 
-  // Improved search function with better scoring
-  const searchProducts = (searchQuery, products) => {
-    if (!searchQuery || !searchQuery.trim()) return [];
-    
-    const normalizedQuery = searchQuery.toLowerCase().trim();
-    const queryWords = normalizedQuery.split(/\s+/);
-    
-    // Georgian to Latin character mapping
-    const georgianToLatin = {
+  // Enhanced search functions (copied from Header component)
+  const removeDiacritics = (str) => {
+    const diacriticsMap = {
+      'á': 'a', 'à': 'a', 'ä': 'a', 'â': 'a', 'ã': 'a', 'å': 'a',
+      'é': 'e', 'è': 'e', 'ë': 'e', 'ê': 'e',
+      'í': 'i', 'ì': 'i', 'ï': 'i', 'î': 'i',
+      'ó': 'o', 'ò': 'o', 'ö': 'o', 'ô': 'o', 'õ': 'o',
+      'ú': 'u', 'ù': 'u', 'ü': 'u', 'û': 'u',
+      'ñ': 'n', 'ç': 'c',
+      // Georgian to Latin approximations
       'ა': 'a', 'ბ': 'b', 'გ': 'g', 'დ': 'd', 'ე': 'e', 'ვ': 'v', 'ზ': 'z',
       'თ': 't', 'ი': 'i', 'კ': 'k', 'ლ': 'l', 'მ': 'm', 'ნ': 'n', 'ო': 'o',
       'პ': 'p', 'ჟ': 'zh', 'რ': 'r', 'ს': 's', 'ტ': 't', 'უ': 'u', 'ფ': 'f',
-      'ქ': 'q', 'ღ': 'gh', 'ყ': 'y', 'შ': 'sh', 'ჩ': 'ch', 'ც': 'ts', 'ძ': 'dz',
-      'წ': 'ts', 'ჭ': 'ch', 'ხ': 'kh', 'ჯ': 'j', 'ჰ': 'h'
+      'ქ': 'q', 'ღ': 'gh', 'ყ': 'y', 'შ': 'sh', 'ჩ': 'ch', 'ც': 'ts',
+      'ძ': 'dz', 'წ': 'ts', 'ჭ': 'ch', 'ხ': 'kh', 'ჯ': 'j', 'ჰ': 'h'
     };
 
-    const latinToGeorgian = Object.fromEntries(
-      Object.entries(georgianToLatin).map(([k, v]) => [v, k])
-    );
-
-    // Function to convert text both ways (Georgian to Latin and vice versa)
-    const convertText = (text) => {
-      const variations = [text];
-      
-      // Georgian to Latin
-      let latinVersion = text;
-      for (const [geo, lat] of Object.entries(georgianToLatin)) {
-        latinVersion = latinVersion.replace(new RegExp(geo, 'g'), lat);
-      }
-      if (latinVersion !== text) variations.push(latinVersion);
-      
-      // Latin to Georgian
-      let georgianVersion = text;
-      for (const [lat, geo] of Object.entries(latinToGeorgian)) {
-        georgianVersion = georgianVersion.replace(new RegExp(lat, 'g'), geo);
-      }
-      if (georgianVersion !== text) variations.push(georgianVersion);
-      
-      return [...new Set(variations)];
-    };
-
-    const productsWithScore = products.map(product => {
-      if (!product.name) return { ...product, score: 0 };
-      
-      const productName = product.name.toLowerCase();
-      const brandName = (product.brand || '').toLowerCase();
-      let score = 0;
-
-      // Generate all variations of query words
-      const queryVariations = queryWords.flatMap(word => convertText(word));
-      
-      queryVariations.forEach(queryWord => {
-        // Exact name match (highest score)
-        if (productName === queryWord) score += 100;
-        
-        // Name starts with query (high score)
-        if (productName.startsWith(queryWord)) score += 80;
-        
-        // Name contains query word (medium score)
-        if (productName.includes(queryWord)) score += 50;
-        
-        // Brand exact match
-        if (brandName === queryWord) score += 90;
-        
-        // Brand starts with query
-        if (brandName.startsWith(queryWord)) score += 70;
-        
-        // Brand contains query
-        if (brandName.includes(queryWord)) score += 40;
-        
-        // Word boundaries in name (words that start with query)
-        const nameWords = productName.split(/\s+/);
-        nameWords.forEach(word => {
-          if (word.startsWith(queryWord)) score += 60;
-        });
-        
-        // Fuzzy matching for partial matches
-        if (queryWord.length >= 3) {
-          const similarity = calculateSimilarity(queryWord, productName);
-          if (similarity > 0.6) score += Math.round(similarity * 30);
-        }
-      });
-
-      return { ...product, score };
-    });
-
-    // Filter products with score > 0 and sort by score
-    return productsWithScore
-      .filter(product => product.score > 0)
-      .sort((a, b) => b.score - a.score);
+    return str.split('').map(char => diacriticsMap[char.toLowerCase()] || char).join('');
   };
 
-  // Simple similarity calculation
-  const calculateSimilarity = (str1, str2) => {
-    const longer = str1.length > str2.length ? str1 : str2;
-    const shorter = str1.length > str2.length ? str2 : str1;
+  const normalizeForSearch = (text) => {
+    if (!text) return '';
     
-    if (longer.length === 0) return 1.0;
+    let normalized = text.toLowerCase().trim();
+    normalized = normalized.replace(/\s+/g, ' ');
+    normalized = removeDiacritics(normalized);
     
-    const editDistance = levenshteinDistance(longer, shorter);
-    return (longer.length - editDistance) / longer.length;
+    return normalized;
   };
 
-  // Levenshtein distance calculation
-  const levenshteinDistance = (str1, str2) => {
-    const matrix = [];
+  const calculateMatchScore = (productText, query) => {
+    const product = normalizeForSearch(productText);
+    const search = normalizeForSearch(query);
     
-    for (let i = 0; i <= str2.length; i++) {
-      matrix[i] = [i];
+    if (!product || !search) return 0;
+    
+    let score = 0;
+    
+    // Exact match gets highest score
+    if (product === search) {
+      score += 100;
     }
     
-    for (let j = 0; j <= str1.length; j++) {
-      matrix[0][j] = j;
+    // Starts with query gets high score
+    if (product.startsWith(search)) {
+      score += 80;
     }
     
-    for (let i = 1; i <= str2.length; i++) {
-      for (let j = 1; j <= str1.length; j++) {
-        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-          matrix[i][j] = matrix[i - 1][j - 1];
+    // Contains query as whole word gets good score
+    if (product.includes(' ' + search + ' ') || product.startsWith(search + ' ') || product.endsWith(' ' + search)) {
+      score += 60;
+    }
+    
+    // Contains query anywhere gets moderate score
+    if (product.includes(search)) {
+      score += 40;
+    }
+    
+    // Only do partial matching for queries longer than 2 characters
+    if (search.length > 2) {
+      let matchingChars = 0;
+      let consecutiveMatches = 0;
+      let maxConsecutive = 0;
+      
+      for (let i = 0; i < search.length; i++) {
+        const char = search[i];
+        const index = product.indexOf(char, i === 0 ? 0 : product.indexOf(search[i-1]) + 1);
+        
+        if (index !== -1) {
+          matchingChars++;
+          consecutiveMatches++;
+          maxConsecutive = Math.max(maxConsecutive, consecutiveMatches);
         } else {
-          matrix[i][j] = Math.min(
-            matrix[i - 1][j - 1] + 1,
-            matrix[i][j - 1] + 1,
-            matrix[i - 1][j] + 1
-          );
+          consecutiveMatches = 0;
         }
+      }
+      
+      // Only add partial match bonus if most characters match
+      const coverage = matchingChars / search.length;
+      if (coverage > 0.7) { // At least 70% of characters must match
+        score += coverage * 15;
+        score += maxConsecutive * 3;
       }
     }
     
-    return matrix[str2.length][str1.length];
+    return score;
   };
 
-  // Perform search when query or products change
+  // Main search function (same logic as Header)
+  const searchProducts = (query, products) => {
+    if (!query || !query.trim() || !products || products.length === 0) {
+      return [];
+    }
+    
+    const normalizedQuery = normalizeForSearch(query);
+    
+    if (normalizedQuery.length < 1) {
+      return [];
+    }
+    
+    const results = products.filter(product => {
+      // Search in product name
+      if (product.name && normalizeForSearch(product.name).includes(normalizedQuery)) {
+        return true;
+      }
+      
+      // Search in brand
+      if (product.brand && normalizeForSearch(product.brand).includes(normalizedQuery)) {
+        return true;
+      }
+      
+      // Search in category
+      if (product.category && normalizeForSearch(product.category).includes(normalizedQuery)) {
+        return true;
+      }
+      
+      // Search in description
+      if (product.description && normalizeForSearch(product.description).includes(normalizedQuery)) {
+        return true;
+      }
+      
+      return false;
+    }).map(product => {
+      // Calculate simple relevance score for sorting
+      let score = 0;
+      
+      const productName = normalizeForSearch(product.name || '');
+      const productBrand = normalizeForSearch(product.brand || '');
+      
+      // Exact match gets highest score
+      if (productName === normalizedQuery) {
+        score = 1000;
+      }
+      // Starts with query
+      else if (productName.startsWith(normalizedQuery)) {
+        score = 800;
+      }
+      // Contains query in name
+      else if (productName.includes(normalizedQuery)) {
+        score = 600;
+      }
+      // Brand match
+      else if (productBrand.includes(normalizedQuery)) {
+        score = 400;
+      }
+      // Category or description match
+      else {
+        score = 200;
+      }
+      
+      return {
+        ...product,
+        searchScore: score
+      };
+    }).sort((a, b) => b.searchScore - a.searchScore);
+    
+    return results;
+  };
+
+  // Perform search when query or products change (using same logic as Header)
   useEffect(() => {
     if (query.trim() && allProducts.length > 0) {
       setLoading(true);
       console.log('🔍 Searching for:', query, 'in', allProducts.length, 'products');
       
+      // Use the same search function as Header component
       const results = searchProducts(query, allProducts);
       console.log('🔍 Found', results.length, 'results');
       
@@ -250,7 +278,7 @@ const SearchResults = ({ allProducts = [] }) => {
       case 'brand':
         filtered.sort((a, b) => (a.brand || '').localeCompare(b.brand || ''));
         break;
-      default: // relevance - keep original order (already sorted by score)
+      default: // relevance - keep original order (already sorted by searchScore)
         break;
     }
 
@@ -297,8 +325,20 @@ const SearchResults = ({ allProducts = [] }) => {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '2rem 1rem' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        {/* Simple Header */}
-        
+        {/* Header */}
+        <div style={{ marginBottom: '2rem' }}>
+          <h2 style={{ 
+            fontSize: '2rem', 
+            marginBottom: '0.5rem', 
+            fontWeight: '700',
+            color: '#111827',
+            textAlign: 'center',
+            letterSpacing: '-0.025em',
+            position: 'relative',
+          }}>
+            ძიების შედეგი:
+          </h2>
+        </div>
 
         {/* Horizontal Filter Bar */}
         {searchResults.length > 0 && (
@@ -329,19 +369,6 @@ const SearchResults = ({ allProducts = [] }) => {
           </div>
         ) : (
           <>
-          <div style={{ marginBottom: '2rem' }}>
-          <h1 style={{ 
-            fontSize: '2rem', 
-            marginBottom: '0.5rem', 
-            color: '#374151',
-            fontWeight: '600'
-          }}>
-            საძიებო შედეგები: "{query}"
-          </h1>
-          <p style={{ fontSize: '1rem', color: '#6b7280' }}>
-            {loading ? 'იტვირთება...' : `მოიძებნა ${filteredResults.length} პროდუქტი`}
-          </p>
-        </div>
             {searchResults.length > 0 && (
               <>
                 {filteredResults.length > 0 ? (

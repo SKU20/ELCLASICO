@@ -1,7 +1,7 @@
-// Header.jsx - Fixed cart functionality
+// Header.jsx - Updated with fixed search count and removed cart hover
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FaShoppingCart, FaUser, FaPhone, FaSearch, FaTimes, FaGoogle, FaSignOutAlt, FaTrash, FaMinus, FaPlus } from 'react-icons/fa';
+import { FaShoppingCart, FaUser, FaPhone, FaSearch, FaTimes, FaGoogle, FaSignOutAlt } from 'react-icons/fa';
 import { FaFacebookF } from 'react-icons/fa';
 import { apiService } from "../services/api";
 import { useCart } from '../contexts/CartContext.jsx';
@@ -23,17 +23,6 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
     clearCart 
   } = useCart();
 
-  // Debug cart state changes
-  useEffect(() => {
-    console.log('🛒 Cart State Changed:', {
-      itemsCount: cartItems?.length || 0,
-      cartItemCount,
-      cartTotal,
-      items: cartItems,
-      user: user?.email || 'Not logged in'
-    });
-  }, [cartItems, cartItemCount, cartTotal, user]);
-
   // Search states
   const [searchValue, setSearchValue] = useState('');
   const [showResults, setShowResults] = useState(false);
@@ -49,10 +38,6 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [showResetPasswordForm, setShowResetPasswordForm] = useState(false);
   const [resetToken, setResetToken] = useState('');
-
-  // Cart dropdown state - SIMPLIFIED
-  const [showCart, setShowCart] = useState(false);
-  const [cartHoverTimeout, setCartHoverTimeout] = useState(null);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -87,25 +72,202 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
     };
   }, [showAuthModal]);
 
-  // Cleanup hover timeout on unmount
+  // Cleanup search timeout on unmount
   useEffect(() => {
     return () => {
-      if (cartHoverTimeout) {
-        clearTimeout(cartHoverTimeout);
+      if (window.searchTimeout) {
+        clearTimeout(window.searchTimeout);
       }
     };
-  }, [cartHoverTimeout]);
+  }, []);
 
-  // Auth and OAuth functions (keeping existing implementation)
-  const handleOAuthCallback = () => {
-    console.log('=== OAuth/Password Reset Callback Debug ===');
+  // Enhanced search functions
+  const removeDiacritics = (str) => {
+    const diacriticsMap = {
+      'á': 'a', 'à': 'a', 'ä': 'a', 'â': 'a', 'ã': 'a', 'å': 'a',
+      'é': 'e', 'è': 'e', 'ë': 'e', 'ê': 'e',
+      'í': 'i', 'ì': 'i', 'ï': 'i', 'î': 'i',
+      'ó': 'o', 'ò': 'o', 'ö': 'o', 'ô': 'o', 'õ': 'o',
+      'ú': 'u', 'ù': 'u', 'ü': 'u', 'û': 'u',
+      'ñ': 'n', 'ç': 'c',
+      // Georgian to Latin approximations
+      'ა': 'a', 'ბ': 'b', 'გ': 'g', 'დ': 'd', 'ე': 'e', 'ვ': 'v', 'ზ': 'z',
+      'თ': 't', 'ი': 'i', 'კ': 'k', 'ლ': 'l', 'მ': 'm', 'ნ': 'n', 'ო': 'o',
+      'პ': 'p', 'ჟ': 'zh', 'რ': 'r', 'ს': 's', 'ტ': 't', 'უ': 'u', 'ფ': 'f',
+      'ქ': 'q', 'ღ': 'gh', 'ყ': 'y', 'შ': 'sh', 'ჩ': 'ch', 'ც': 'ts',
+      'ძ': 'dz', 'წ': 'ts', 'ჭ': 'ch', 'ხ': 'kh', 'ჯ': 'j', 'ჰ': 'h'
+    };
+
+    return str.split('').map(char => diacriticsMap[char.toLowerCase()] || char).join('');
+  };
+
+  const normalizeForSearch = (text) => {
+    if (!text) return '';
     
+    let normalized = text.toLowerCase().trim();
+    normalized = normalized.replace(/\s+/g, ' ');
+    normalized = removeDiacritics(normalized);
+    
+    return normalized;
+  };
+
+  const calculateMatchScore = (productText, query) => {
+    const product = normalizeForSearch(productText);
+    const search = normalizeForSearch(query);
+    
+    if (!product || !search) return 0;
+    
+    let score = 0;
+    
+    // Exact match gets highest score
+    if (product === search) {
+      score += 100;
+    }
+    
+    // Starts with query gets high score
+    if (product.startsWith(search)) {
+      score += 80;
+    }
+    
+    // Contains query as whole word gets good score
+    if (product.includes(' ' + search + ' ') || product.startsWith(search + ' ') || product.endsWith(' ' + search)) {
+      score += 60;
+    }
+    
+    // Contains query anywhere gets moderate score
+    if (product.includes(search)) {
+      score += 40;
+    }
+    
+    // Only do partial matching for queries longer than 2 characters
+    if (search.length > 2) {
+      let matchingChars = 0;
+      let consecutiveMatches = 0;
+      let maxConsecutive = 0;
+      
+      for (let i = 0; i < search.length; i++) {
+        const char = search[i];
+        const index = product.indexOf(char, i === 0 ? 0 : product.indexOf(search[i-1]) + 1);
+        
+        if (index !== -1) {
+          matchingChars++;
+          consecutiveMatches++;
+          maxConsecutive = Math.max(maxConsecutive, consecutiveMatches);
+        } else {
+          consecutiveMatches = 0;
+        }
+      }
+      
+      // Only add partial match bonus if most characters match
+      const coverage = matchingChars / search.length;
+      if (coverage > 0.7) { // At least 70% of characters must match
+        score += coverage * 15;
+        score += maxConsecutive * 3;
+      }
+    }
+    
+    return score;
+  };
+
+  const searchProducts = (query, products) => {
+    if (!query || !query.trim() || !products || products.length === 0) {
+      return [];
+    }
+    
+    const normalizedQuery = normalizeForSearch(query);
+    
+    if (normalizedQuery.length < 1) {
+      return [];
+    }
+    
+    const results = products.filter(product => {
+      // Search in product name
+      if (product.name && normalizeForSearch(product.name).includes(normalizedQuery)) {
+        return true;
+      }
+      
+      // Search in brand
+      if (product.brand && normalizeForSearch(product.brand).includes(normalizedQuery)) {
+        return true;
+      }
+      
+      // Search in category
+      if (product.category && normalizeForSearch(product.category).includes(normalizedQuery)) {
+        return true;
+      }
+      
+      // Search in description
+      if (product.description && normalizeForSearch(product.description).includes(normalizedQuery)) {
+        return true;
+      }
+      
+      return false;
+    }).map(product => {
+      // Calculate simple relevance score for sorting
+      let score = 0;
+      
+      const productName = normalizeForSearch(product.name || '');
+      const productBrand = normalizeForSearch(product.brand || '');
+      
+      // Exact match gets highest score
+      if (productName === normalizedQuery) {
+        score = 1000;
+      }
+      // Starts with query
+      else if (productName.startsWith(normalizedQuery)) {
+        score = 800;
+      }
+      // Contains query in name
+      else if (productName.includes(normalizedQuery)) {
+        score = 600;
+      }
+      // Brand match
+      else if (productBrand.includes(normalizedQuery)) {
+        score = 400;
+      }
+      // Category or description match
+      else {
+        score = 200;
+      }
+      
+      return {
+        ...product,
+        searchScore: score
+      };
+    }).sort((a, b) => b.searchScore - a.searchScore);
+    
+    return results;
+  };
+
+  const highlightMatch = (text, query) => {
+    if (!text || !query) return text;
+    
+    const normalizedText = normalizeForSearch(text);
+    const normalizedQuery = normalizeForSearch(query);
+    
+    const index = normalizedText.indexOf(normalizedQuery);
+    if (index === -1) return text;
+    
+    const before = text.substring(0, index);
+    const match = text.substring(index, index + query.length);
+    const after = text.substring(index + query.length);
+    
+    return (
+      <>
+        {before}
+        <mark className="search-highlight">{match}</mark>
+        {after}
+      </>
+    );
+  };
+
+  // Auth and OAuth functions
+  const handleOAuthCallback = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const sessionEncoded = urlParams.get('session');
     const authSuccess = urlParams.get('auth_success');
     const authError = urlParams.get('error');
     
-    // Password reset parameters
     const accessToken = urlParams.get('access_token');
     const refreshToken = urlParams.get('refresh_token');
     const expiresIn = urlParams.get('expires_in');
@@ -113,20 +275,8 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
     const type = urlParams.get('type');
     const mode = urlParams.get('mode');
 
-    console.log('URL params:', {
-      sessionEncoded: sessionEncoded ? 'EXISTS' : 'MISSING',
-      authSuccess: authSuccess,
-      authError: authError,
-      accessToken: accessToken ? `${accessToken.substring(0, 10)}...` : 'MISSING',
-      refreshToken: refreshToken ? 'EXISTS' : 'MISSING',
-      type: type,
-      mode: mode,
-      fullURL: window.location.href,
-    });
-
     // Handle password reset from email
     if (mode === 'reset_password' && accessToken) {
-      console.log('Password reset mode detected');
       setShowResetPasswordForm(true);
       setResetToken(accessToken);
       navigate('/');
@@ -135,31 +285,24 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
 
     // Handle regular OAuth error
     if (authError) {
-      console.error('OAuth error from URL:', authError);
       showNotification('ავტორიზაცია ვერ მოხერხდა: ' + authError);
       navigate('/');
       return;
     }
 
-    // Handle regular OAuth success (Google/Facebook login)
+    // Handle regular OAuth success
     if (sessionEncoded || authSuccess) {
-      console.log('Detected query params OAuth callback');
-
       if (!authSuccess || authSuccess !== 'true') {
-        console.log('Auth not successful or missing auth_success=true');
         return;
       }
 
       if (!sessionEncoded) {
-        console.error('No session data in URL');
         showNotification('სესიის მონაცემები არ მოიძებნა');
         return;
       }
 
       try {
-        console.log('Attempting to decode session from query params...');
         const session = JSON.parse(decodeURIComponent(sessionEncoded));
-        console.log('Decoded session:', session);
 
         if (!session.access_token) throw new Error('No access token in session');
         if (!session.user) throw new Error('No user data in session');
@@ -171,37 +314,27 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
           user: session.user,
         };
 
-        console.log('Storing auth session:', authSession);
         localStorage.setItem('auth_session', JSON.stringify(authSession));
-
         setUser(session.user);
-        console.log('User state set successfully');
         showNotification(`კეთილი იყოს მობრძანება, ${session.user.firstName || session.user.email}!`, 'success');
-
         navigate('/');
       } catch (error) {
-        console.error('OAuth session parsing failed:', error);
-        console.error('Raw session data:', sessionEncoded);
         showNotification('ავტორიზაცია ვერ მოხერხდა: ' + error.message);
         navigate('/');
       }
       return;
     }
 
-    // Handle direct OAuth tokens in URL hash (fallback)
+    // Handle direct OAuth tokens in URL hash
     const hash = window.location.hash;
     if (hash) {
-      console.log('Detected OAuth tokens in URL hash:', hash);
-
       try {
         const params = new URLSearchParams(hash.slice(1));
-
         const access_token = params.get('access_token');
         const refresh_token = params.get('refresh_token');
         const expires_at = params.get('expires_at') ? Number(params.get('expires_at')) : null;
 
         if (!access_token) {
-          console.error('No access_token found in URL hash');
           return;
         }
 
@@ -216,15 +349,12 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
           }
         };
 
-        console.log('Storing auth session from hash:', authSession);
         localStorage.setItem('auth_session', JSON.stringify(authSession));
-
         setUser(authSession.user);
         showNotification('ავტორიზაცია წარმატებულია!', 'success');
         navigate('/');
 
       } catch (error) {
-        console.error('Error parsing OAuth tokens from URL hash:', error);
         showNotification('ავტორიზაცია ვერ მოხერხდა: ' + error.message);
         navigate('/');
       }
@@ -238,7 +368,6 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
         setUser(userData);
       }
     } catch (error) {
-      console.log('No user logged in or session expired');
       apiService.clearAuthData();
     }
   };
@@ -290,110 +419,9 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
     }
   };
 
-  // FIXED Cart functions with better hover handling
-  const handleCartMouseEnter = () => {
-    console.log('🛒 Cart mouse enter');
-    
-    // Clear any existing timeout
-    if (cartHoverTimeout) {
-      clearTimeout(cartHoverTimeout);
-      setCartHoverTimeout(null);
-    }
-    
-    setShowCart(true);
-  };
-
-  const handleCartMouseLeave = () => {
-    console.log('🛒 Cart mouse leave');
-    
-    // Set a timeout to close the cart dropdown
-    const timeout = setTimeout(() => {
-      console.log('🛒 Cart timeout triggered - closing cart');
-      setShowCart(false);
-    }, 300); // 300ms delay for better UX
-    
-    setCartHoverTimeout(timeout);
-  };
-
-  const handleCartDropdownMouseEnter = () => {
-    console.log('🛒 Cart dropdown mouse enter');
-    
-    // Clear any existing timeout to keep dropdown open
-    if (cartHoverTimeout) {
-      clearTimeout(cartHoverTimeout);
-      setCartHoverTimeout(null);
-    }
-    
-    setShowCart(true);
-  };
-
-  const handleCartDropdownMouseLeave = () => {
-    console.log('🛒 Cart dropdown mouse leave');
-    
-    // Set a timeout to close the cart dropdown
-    const timeout = setTimeout(() => {
-      console.log('🛒 Cart dropdown timeout triggered - closing cart');
-      setShowCart(false);
-    }, 200); // Shorter delay when leaving dropdown
-    
-    setCartHoverTimeout(timeout);
-  };
-
-  // FIXED: Cart icon click goes to cart page
+  // Cart functions (simplified - removed hover functionality)
   const handleCartClick = () => {
-    console.log('🛒 Cart icon clicked - going to cart page');
-    setShowCart(false);
-    
-    // Clear any timeout
-    if (cartHoverTimeout) {
-      clearTimeout(cartHoverTimeout);
-      setCartHoverTimeout(null);
-    }
-    
     navigate('/cart');
-  };
-
-  // View cart button in dropdown - also goes to cart
-  const handleOpenCart = () => {
-    console.log('🛒 View cart button clicked - going to cart page');
-    setShowCart(false);
-    
-    // Clear any timeout
-    if (cartHoverTimeout) {
-      clearTimeout(cartHoverTimeout);
-      setCartHoverTimeout(null);
-    }
-    
-    navigate('/cart');
-  };
-
-  const handleQuantityChange = async (itemId, newQuantity) => {
-    console.log('🛒 Quantity change:', { itemId, newQuantity });
-    
-    if (newQuantity <= 0) {
-      // Remove item if quantity is 0 or less
-      await removeFromCart(itemId);
-    } else {
-      await updateQuantity(itemId, newQuantity);
-    }
-  };
-
-  const handleRemoveItem = async (itemId, itemName) => {
-    console.log('🛒 Removing item:', { itemId, itemName });
-    
-    if (window.confirm(`გსურთ "${itemName}" წაშალება კალათიდან?`)) {
-      await removeFromCart(itemId);
-      showNotification(`"${itemName}" წაშალდა კალათიდან`, 'success');
-    }
-  };
-
-  const handleClearCart = async () => {
-    if (cartItems.length === 0) return;
-    
-    if (window.confirm('გსურთ კალათის გაწმენდა?')) {
-      await clearCart();
-      showNotification('კალათა გაიწმინდა', 'success');
-    }
   };
 
   // Format price with currency
@@ -404,7 +432,7 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
     return `₾${price.toLocaleString('ka-GE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   };
 
-  // Search functions (keeping existing implementation)
+  // Search functions
   const handleSearchFocus = () => {
     if (onSearchFocus) {
       onSearchFocus();
@@ -429,121 +457,34 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
     }
   };
 
-  // Enhanced search function with Georgian letter recognition
-  const normalizeGeorgianText = (text) => {
-    if (!text) return '';
-    
-    const normalized = text.toLowerCase().trim();
-    
-    const georgianVariations = {
-      'ა': ['ა', 'a'],
-      'ბ': ['ბ', 'b'],
-      'გ': ['გ', 'g'],
-      'დ': ['დ', 'd'],
-      'ე': ['ე', 'e'],
-      'ვ': ['ვ', 'v', 'w'],
-      'ზ': ['ზ', 'z'],
-      'თ': ['თ', 't'],
-      'ი': ['ი', 'i'],
-      'კ': ['კ', 'k'],
-      'ლ': ['ლ', 'l'],
-      'მ': ['მ', 'm'],
-      'ნ': ['ნ', 'n'],
-      'ო': ['ო', 'o'],
-      'პ': ['პ', 'p'],
-      'ჟ': ['ჟ', 'zh', 'j'],
-      'რ': ['რ', 'r'],
-      'ს': ['ს', 's'],
-      'ტ': ['ტ', 't'],
-      'უ': ['უ', 'u'],
-      'ფ': ['ფ', 'f', 'ph'],
-      'ქ': ['ქ', 'q', 'k'],
-      'ღ': ['ღ', 'gh'],
-      'ყ': ['ყ', 'y'],
-      'შ': ['შ', 'sh'],
-      'ჩ': ['ჩ', 'ch'],
-      'ც': ['ც', 'ts', 'c'],
-      'ძ': ['ძ', 'dz'],
-      'წ': ['წ', 'ts'],
-      'ჭ': ['ჭ', 'ch'],
-      'ხ': ['ხ', 'kh', 'x'],
-      'ჯ': ['ჯ', 'j'],
-      'ჰ': ['ჰ', 'h']
-    };
-    
-    return { normalized, georgianVariations };
-  };
-
-  const searchProducts = (query, products) => {
-    if (!query || !query.trim()) return [];
-    
-    const { normalized: normalizedQuery, georgianVariations } = normalizeGeorgianText(query);
-    
-    return products.filter(product => {
-      if (!product.name) return false;
-      
-      const { normalized: productName } = normalizeGeorgianText(product.name);
-      
-      // Direct match
-      if (productName.includes(normalizedQuery)) {
-        return true;
-      }
-      
-      // Brand match
-      if (product.brand) {
-        const { normalized: brandName } = normalizeGeorgianText(product.brand);
-        if (brandName.includes(normalizedQuery)) {
-          return true;
-        }
-      }
-      
-      // Character-by-character fuzzy matching for Georgian/Latin mix
-      const queryChars = normalizedQuery.split('');
-      let productMatches = 0;
-      
-      queryChars.forEach(queryChar => {
-        // Check direct character match
-        if (productName.includes(queryChar)) {
-          productMatches++;
-          return;
-        }
-        
-        // Check Georgian variations
-        Object.entries(georgianVariations).forEach(([georgian, variations]) => {
-          if (variations.includes(queryChar) && productName.includes(georgian)) {
-            productMatches++;
-          } else if (queryChar === georgian) {
-            variations.forEach(variation => {
-              if (productName.includes(variation)) {
-                productMatches++;
-              }
-            });
-          }
-        });
-      });
-      
-      // Return true if most characters match (adjust threshold as needed)
-      return productMatches >= Math.min(3, Math.ceil(queryChars.length * 0.6));
-    });
-  };
-
   const handleInputChange = (e) => {
     const value = e.target.value;
-    console.log('🔍 Header Search input:', value);
-    console.log('📦 Header Products available:', allProducts.length);
     setSearchValue(value);
     
     if (value.trim()) {
-      const filtered = searchProducts(value, allProducts);
-      console.log('Header Filtered results:', filtered.length);
-      setSearchResults(filtered.slice(0, 10));
+      setLoading(true);
+      
+      if (window.searchTimeout) {
+        clearTimeout(window.searchTimeout);
+      }
+      
+      window.searchTimeout = setTimeout(() => {
+        const filtered = searchProducts(value.trim(), allProducts);
+        // Show all matching results, no limit for dropdown suggestions
+        setSearchResults(filtered);
+        setLoading(false);
+      }, 150);
     } else {
       setSearchResults([]);
+      setLoading(false);
+      
+      if (window.searchTimeout) {
+        clearTimeout(window.searchTimeout);
+      }
     }
   };
 
   const handleResultClick = (result) => {
-    console.log('Selected product:', result);
     setSearchValue('');
     setSearchResults([]);
     setShowResults(false);
@@ -568,7 +509,8 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
       onSearchBlur();
     }
     
-    navigate(`/results?q=${encodeURIComponent(searchValue.trim())}`);
+    const searchTerm = searchValue.trim();
+    navigate(`/results?q=${encodeURIComponent(searchTerm)}`);
   };
 
   const handleKeyDown = (e) => {
@@ -577,7 +519,7 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
     }
   };
 
-  // Auth functions (keeping existing implementation)
+  // Auth functions
   const handleAuthClick = () => {
     if (user) {
       handleLogout();
@@ -614,14 +556,11 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
     setLoading(true);
     
     try {
-      console.log('Attempting login with:', formData.email);
       const userData = await apiService.login(formData.email, formData.password);
-      console.log('Login successful:', userData);
       setUser(userData);
       navigate('/');
       showNotification(`კეთილი იყოს მობრძანება, ${userData.firstName || userData.email}!`, 'success');
     } catch (error) {
-      console.error('Login error:', error);
       showNotification('შესვლის შეცდომა: ' + error.message);
     } finally {
       setLoading(false);
@@ -655,7 +594,6 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
         dateOfBirth: ''
       });
     } catch (error) {
-      console.error('Signup error:', error);
       showNotification('რეგისტრაციის შეცდომა: ' + error.message);
     } finally {
       setLoading(false);
@@ -668,7 +606,6 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
       setUser(null);
       navigate('/');
     } catch (error) {
-      console.error('Logout error:', error);
       setUser(null);
       navigate('/');
     }
@@ -696,7 +633,6 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
       setResetEmailSent(true);
       showNotification('პაროლის აღდგენის ინსტრუქცია გამოგზავნილია თქვენს ელ-ფოსტაზე', 'success');
     } catch (error) {
-      console.error('Password reset error:', error);
       showNotification('პაროლის აღდგენის შეცდომა: ' + error.message);
     } finally {
       setLoading(false);
@@ -777,7 +713,11 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
                 </div>
               </div>
 
-              {searchValue ? (
+              {loading ? (
+                <div className="search-loading">
+                  <span>ძიება...</span>
+                </div>
+              ) : searchValue ? (
                 resultsToShow.length > 0 ? (
                   resultsToShow.map((result, index) => (
                     <div
@@ -786,20 +726,28 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
                       className={`search-result-item ${index < resultsToShow.length - 1 ? 'has-border' : ''}`}
                     >
                       <img
-                        src={result.image}
+                        src={result.image || result.imageUrl}
                         alt={result.name}
                         className="search-result-image"
+                        onError={(e) => {
+                          e.target.src = '/api/placeholder/60/60';
+                        }}
                       />
                       <div className="search-result-content">
                         <div className="search-result-name">
-                          {result.name}
+                          {highlightMatch(result.name, searchValue)}
                         </div>
                         <div className="search-result-price">
                           {formatPrice(result.price)}
                         </div>
                         {result.brand && (
                           <div className="search-result-brand">
-                            {result.brand}
+                            {highlightMatch(result.brand, searchValue)}
+                          </div>
+                        )}
+                        {result.matchedField && result.matchedField !== 'name' && (
+                          <div className="search-result-matched">
+                            ნაპოვნია: {result.matchedField}
                           </div>
                         )}
                       </div>
@@ -829,13 +777,7 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
         </form>
 
         <div className="icons">
-          {/* FIXED Cart with proper click and hover behavior */}
-          <div 
-            className="icon-wrapper cart-wrapper"
-            onMouseEnter={handleCartMouseEnter}
-            onMouseLeave={handleCartMouseLeave}
-            onClick={handleCartClick}
-          >
+          <div className="icon-wrapper" onClick={handleCartClick}>
             <div className="cart-icon-container">
               <FaShoppingCart className="icon" />
               <span className="icon-text">კალათა</span>
@@ -845,156 +787,6 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
                 </span>
               )}
             </div>
-            
-            {/* Enhanced Cart Dropdown */}
-            {showCart && (
-              <div 
-                className="cart-dropdown enhanced-cart-dropdown"
-                onMouseEnter={handleCartDropdownMouseEnter}
-                onMouseLeave={handleCartDropdownMouseLeave}
-              >
-                <div className="cart-dropdown-header">
-                  <div className="cart-header-info">
-                    <span className="cart-title">შენი კალათა</span>
-                    <span className="cart-item-count">
-                      {cartItemCount} {cartItemCount === 1 ? 'პროდუქტი' : 'პროდუქტი'}
-                    </span>
-                  </div>
-                  {cartItems.length > 0 && (
-                    <button 
-                      className="clear-cart-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleClearCart();
-                      }}
-                      title="კალათის გაწმენდა"
-                    >
-                      <FaTrash />
-                    </button>
-                  )}
-                </div>
-                
-                <div className="cart-dropdown-items">
-                  {cartItems.length === 0 ? (
-                    <div className="cart-empty">
-                      <div className="cart-empty-icon">🛒</div>
-                      <div className="cart-empty-text">კალათა ცარიელია</div>
-                      <div className="cart-empty-subtext">დაამატე პროდუქტები შესყიდვისთვის</div>
-                    </div>
-                  ) : (
-                    <div className="cart-items-list">
-                      {cartItems.slice(0, 4).map((item) => (
-                        <div key={`cart-item-${item.id}`} className="cart-item enhanced-cart-item">
-                          <div className="cart-item-image-container">
-                            <img 
-                              src={item.image || item.imageUrl || '/api/placeholder/60/60'} 
-                              alt={item.name} 
-                              className="cart-item-image"
-                              onError={(e) => {
-                                e.target.src = '/api/placeholder/60/60';
-                              }}
-                            />
-                          </div>
-                          
-                          <div className="cart-item-details">
-                            <div className="cart-item-name" title={item.name}>
-                              {item.name}
-                            </div>
-                            <div className="cart-item-price">
-                              {formatPrice(item.price)}
-                            </div>
-                            {item.selectedSize && (
-                              <div className="cart-item-size">
-                                ზომა: {item.selectedSize}
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="cart-item-controls">
-                            <div className="quantity-controls">
-                              <button 
-                                className="quantity-btn quantity-minus"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleQuantityChange(item.id, item.quantity - 1);
-                                }}
-                                disabled={item.quantity <= 1}
-                              >
-                                <FaMinus />
-                              </button>
-                              <span className="quantity-display">{item.quantity}</span>
-                              <button 
-                                className="quantity-btn quantity-plus"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleQuantityChange(item.id, item.quantity + 1);
-                                }}
-                              >
-                                <FaPlus />
-                              </button>
-                            </div>
-                            <button 
-                              className="remove-item-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRemoveItem(item.id, item.name);
-                              }}
-                              title="პროდუქტის წაშლა"
-                            >
-                              <FaTrash />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      
-                      {cartItems.length > 4 && (
-                        <div className="cart-more-items">
-                          <span>და კიდევ {cartItems.length - 4} პროდუქტი...</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                
-                {cartItems.length > 0 && (
-                  <>
-                    <div className="cart-dropdown-summary">
-                      <div className="cart-total-row">
-                        <span className="total-label">სულ ღირებულება:</span>
-                        <span className="total-amount">{formatPrice(cartTotal)}</span>
-                      </div>
-                      {cartItems.length > 1 && (
-                        <div className="cart-savings">
-                          <small>დღეს დაზოგე 15% ყველა პროდუქტზე!</small>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="cart-dropdown-actions">
-                      <button 
-                        className="view-cart-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenCart();
-                        }}
-                      >
-                        კალათის ნახვა
-                      </button>
-                      <button 
-                        className="checkout-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowCart(false);
-                          navigate('/checkout');
-                        }}
-                      >
-                        შეკვეთა
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
           </div>
 
           <div 
@@ -1036,7 +828,6 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
             </div>
 
             <div className="auth-modal-content">
-              {/* Show forgot password form if in forgot password mode */}
               {forgotPasswordMode ? (
                 <form onSubmit={handleForgotPasswordSubmit} className="auth-form">
                   <div className="form-group">
@@ -1078,7 +869,6 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
                 </form>
               ) : (
                 <>
-                  {/* OAuth Buttons Section - only show in login mode */}
                   {authMode === 'login' && (
                     <div className="oauth-section">
                       <button 
@@ -1102,7 +892,6 @@ const Header = ({ onSearchFocus, onSearchBlur, isSearchActive, allProducts = [] 
                     </div>
                   )}
 
-                  {/* Email/Password Form */}
                   <form onSubmit={authMode === 'login' ? handleLogin : handleSignup} className="auth-form">
                     {authMode === 'signup' && (
                       <>

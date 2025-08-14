@@ -253,7 +253,6 @@ const CartPage = () => {
 
   return (
     <div className="cart-page">
-      <Header />
       
       <div className="cart-container">
         {/* Cart Header */}
@@ -362,7 +361,6 @@ const CartPage = () => {
                     <div>პროდუქტი</div>
                     <div>ფასი</div>
                     <div>რაოდენობა</div>
-                    <div>სულ</div>
                     <div></div>
                   </div>
                 </div>
@@ -449,13 +447,6 @@ const CartPage = () => {
                               <FaPlus />
                             </button>
                           </div>
-
-                          {/* Item Total */}
-                          <div className="cart-item-total">
-                            {formatPrice((priceChange?.newPrice || item.price) * item.quantity)}
-                          </div>
-
-                          {/* Remove Button */}
                           <div className="remove-item-container">
                             <button
                               onClick={() => handleRemoveItem(item.id, item.name)}
@@ -621,8 +612,6 @@ const CartPage = () => {
           </div>
         </div>
       )}
-
-      <Footer />
     </div>
   );
 };
