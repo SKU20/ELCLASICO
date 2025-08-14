@@ -9,7 +9,7 @@ import MainLayout from './components/MainLayout';
 import ProductPage from './components/ProductPage';
 import UpdatePasswordPage from './components/UpdatePasswordPage';
 import CartPage from './components/CartPage';
-
+import SearchResults from './components/SearchResults';
 
 // Page components with their own header/footer
 const HomePage = ({ allProducts, productsLoading }) => (
@@ -42,13 +42,11 @@ const SignupPage = () => (
   </>
 );
 
-const SearchResultsPage = () => (
+// FIXED: SearchResults now has Header and Footer
+const SearchResultsPage = ({ allProducts }) => (
   <>
-    <Header />
-    <div style={{ padding: '2rem', minHeight: '60vh' }}>
-      <h1>Search Results</h1>
-      <p>Search results page coming soon...</p>
-    </div>
+    <Header allProducts={allProducts} />
+    <SearchResults allProducts={allProducts} />
     <Footer />
   </>
 );
@@ -60,6 +58,14 @@ const CheckoutPage = () => (
       <h1>Checkout</h1>
       <p>Checkout page coming soon...</p>
     </div>
+    <Footer />
+  </>
+);
+
+const CartPageWithLayout = () => (
+  <>
+    <Header />
+    <CartPage />
     <Footer />
   </>
 );
@@ -139,12 +145,16 @@ const AppContent = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route 
-  path="/product/:productId" 
-  element={<ProductPageWithLayout allProducts={allProducts} />} 
-/>
-      <Route path="/cart" element={<CartPage />} />
+        path="/product/:productId" 
+        element={<ProductPageWithLayout allProducts={allProducts} />} 
+      />
+      <Route path="/cart" element={<CartPageWithLayout />} />
       <Route path="/checkout" element={<CheckoutPage />} />
-      <Route path="/results" element={<SearchResultsPage />} />
+      {/* FIXED: Now uses SearchResultsPage wrapper with Header and Footer */}
+      <Route 
+        path="/results" 
+        element={<SearchResultsPage allProducts={allProducts} />} 
+      />
       <Route path="/update-password" element={<UpdatePasswordPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

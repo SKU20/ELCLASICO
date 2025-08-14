@@ -520,16 +520,24 @@ const ProductPage = () => {
                     color="#fbbf24"
                   />
                 ))}
-                <span className="rating-text">({product.reviewCount} შეფასება)</span>
+                <span className="rating-text"></span>
               </div>
             </div>
 
             <div className="price-section">
-              <span className="current-price">{product.price?.toFixed(2)} ₾</span>
-              {product.originalPrice && product.originalPrice > product.price && (
-                <span className="original-price">{product.originalPrice.toFixed(2)} ₾</span>
-              )}
-            </div>
+  {product.price === 0 ? (
+    // If price is 0, show only original price
+    <span className="current-price">{product.originalPrice?.toFixed(2)} ₾</span>
+  ) : (
+    // Normal price display logic
+    <>
+      <span className="current-price">{product.price?.toFixed(2)} ₾</span>
+      {product.originalPrice && product.originalPrice > product.price && (
+        <span className="original-price">{product.originalPrice.toFixed(2)} ₾</span>
+      )}
+    </>
+  )}
+</div>
           </div>
 
           {product.sizes && product.sizes.length > 0 && (
