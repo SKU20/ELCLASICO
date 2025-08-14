@@ -531,12 +531,30 @@ app.get('/api/auth/user', authenticateUser, async (req, res) => {
   }
 });
 // Google OAuth initiation route - Server-side flow
+const getRedirectUrl = (req, provider) => {
+  // Use environment variable if available, otherwise construct from request
+  if (process.env.NODE_ENV === 'production' && BACKEND_URL !== 'http://localhost:3000') {
+    return `${BACKEND_URL}/api/auth/callback/${provider}`;
+  }
+  
+  // For development or fallback
+  return `${req.protocol}://${req.get('host')}/api/auth/callback/${provider}`;
+};
+
+// Google OAuth initiation route - Updated
 app.get('/api/auth/google', async (req, res) => {
   try {
+    console.log('=== Initiating Google OAuth ===');
+    console.log('Environment:', process.env.NODE_ENV);
+    console.log('Backend URL:', BACKEND_URL);
+    
+    const redirectUrl = getRedirectUrl(req, 'google');
+    console.log('Using redirect URL:', redirectUrl);
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${req.protocol}://${req.get('host')}/api/auth/callback/google`,
+        redirectTo: redirectUrl,
         // Force server-side flow
         flowType: 'pkce',
         queryParams: {
@@ -567,15 +585,19 @@ app.get('/api/auth/google', async (req, res) => {
   }
 });
 
-// Facebook OAuth route - Server-side flow with explicit parameters
+// Facebook OAuth route - Updated
 app.get('/api/auth/facebook', async (req, res) => {
   console.log('=== Initiating Facebook OAuth ===');
+  console.log('Environment:', process.env.NODE_ENV);
   
   try {
+    const redirectUrl = getRedirectUrl(req, 'facebook');
+    console.log('Using redirect URL:', redirectUrl);
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'facebook',
       options: {
-        redirectTo: `${req.protocol}://${req.get('host')}/api/auth/callback/facebook`,
+        redirectTo: redirectUrl,
         // Force server-side flow with explicit parameters
         flowType: 'pkce',
         scopes: 'email,public_profile',
@@ -607,17 +629,18 @@ app.get('/api/auth/facebook', async (req, res) => {
   }
 });
 
-// Google OAuth callback - Handle both server and client flows
+// Google OAuth callback - Updated with better error handling
 app.get('/api/auth/callback/google', async (req, res) => {
   console.log('=== Google OAuth Callback ===');
   console.log('Query params:', req.query);
   console.log('Full URL:', req.url);
+  console.log('Frontend URL:', FRONTEND_URL);
   
-  const { code, error, error_description, access_token, refresh_token } = req.query;
+  const { code, error, error_description } = req.query;
 
   if (error) {
     console.error('OAuth error from Google:', error, error_description);
-    return res.redirect(`/?error=google_oauth_error&details=${encodeURIComponent(error_description || error)}`);
+    return res.redirect(`${FRONTEND_URL}/?error=google_oauth_error&details=${encodeURIComponent(error_description || error)}`);
   }
 
   // Handle server-side flow (with authorization code)
@@ -628,84 +651,50 @@ app.get('/api/auth/callback/google', async (req, res) => {
 
       if (supabaseError) {
         console.error('Supabase session exchange error:', supabaseError);
-        return res.redirect(`/?error=session_exchange_failed&details=${encodeURIComponent(supabaseError.message)}`);
+        return res.redirect(`${FRONTEND_URL}/?error=session_exchange_failed&details=${encodeURIComponent(supabaseError.message)}`);
       }
 
       if (!data.session || !data.user) {
         console.error('No session or user data received');
-        return res.redirect('/?error=incomplete_session_data');
+        return res.redirect(`${FRONTEND_URL}/?error=incomplete_session_data`);
       }
 
       console.log('Session exchange successful');
       
-      const sessionData = this.createSessionData(data);
+      const sessionData = createSessionData(data);
       const encoded = Buffer.from(JSON.stringify(sessionData)).toString('base64');
       
-      return res.redirect(`/?auth_success=true&session=${encoded}`);
+      return res.redirect(`${FRONTEND_URL}/?auth_success=true&session=${encoded}&provider=google`);
       
     } catch (err) {
       console.error('Google callback error:', err);
-      return res.redirect(`/?error=callback_exception&details=${encodeURIComponent(err.message)}`);
+      return res.redirect(`${FRONTEND_URL}/?error=callback_exception&details=${encodeURIComponent(err.message)}`);
     }
   }
 
   // Handle client-side flow (redirect to frontend to process fragment)
-  if (!code && !access_token) {
-    console.log('No code or access_token, redirecting to frontend to handle fragment');
-    return res.redirect('/?auth_flow=client_side');
+  if (!code) {
+    console.log('No code, redirecting to frontend to handle fragment');
+    return res.redirect(`${FRONTEND_URL}/?auth_flow=client_side&provider=google`);
   }
 
   // If we have tokens directly (shouldn't happen in server flow, but just in case)
   console.log('Unexpected token parameters in server callback');
-  return res.redirect('/?error=unexpected_flow');
+  return res.redirect(`${FRONTEND_URL}/?error=unexpected_flow&provider=google`);
 });
 
-// Helper function to create session data
-function createSessionData(data) {
-  const userMetadata = data.user.user_metadata || {};
-  
-  // Handle different OAuth provider metadata formats
-  let firstName = userMetadata.first_name || 
-                  userMetadata.given_name || 
-                  userMetadata.name?.split(' ')[0] || 
-                  userMetadata.full_name?.split(' ')[0] || '';
-  
-  let lastName = userMetadata.last_name || 
-                 userMetadata.family_name || 
-                 userMetadata.name?.split(' ').slice(1).join(' ') || 
-                 userMetadata.full_name?.split(' ').slice(1).join(' ') || '';
-
-  console.log('Creating session data with metadata:', {
-    original: userMetadata,
-    parsed: { firstName, lastName }
-  });
-
-  return {
-    access_token: data.session.access_token,
-    refresh_token: data.session.refresh_token,
-    expires_at: data.session.expires_at,
-    user: {
-      id: data.user.id,
-      email: data.user.email,
-      firstName: firstName,
-      lastName: lastName,
-      phoneNumber: userMetadata.phone_number || '',
-      avatar: userMetadata.avatar_url || userMetadata.picture || ''
-    }
-  };
-}
-
-// Facebook OAuth callback - Handle both server and client flows
+// Facebook OAuth callback - Updated with better error handling
 app.get('/api/auth/callback/facebook', async (req, res) => {
   console.log('=== Facebook OAuth Callback ===');
   console.log('Query params:', req.query);
   console.log('Full URL:', req.url);
+  console.log('Frontend URL:', FRONTEND_URL);
   
-  const { code, error, error_description, access_token, refresh_token } = req.query;
+  const { code, error, error_description } = req.query;
 
   if (error) {
     console.error('OAuth error from Facebook:', error, error_description);
-    return res.redirect(`/?error=facebook_oauth_error&details=${encodeURIComponent(error_description || error)}`);
+    return res.redirect(`${FRONTEND_URL}/?error=facebook_oauth_error&details=${encodeURIComponent(error_description || error)}`);
   }
 
   // Handle server-side flow (with authorization code)
@@ -716,159 +705,45 @@ app.get('/api/auth/callback/facebook', async (req, res) => {
 
       if (supabaseError) {
         console.error('Supabase session exchange error:', supabaseError);
-        return res.redirect(`/?error=session_exchange_failed&details=${encodeURIComponent(supabaseError.message)}`);
+        return res.redirect(`${FRONTEND_URL}/?error=session_exchange_failed&details=${encodeURIComponent(supabaseError.message)}`);
       }
 
       if (!data.session || !data.user) {
         console.error('No session or user data received');
-        return res.redirect('/?error=incomplete_session_data');
+        return res.redirect(`${FRONTEND_URL}/?error=incomplete_session_data`);
       }
 
       console.log('Facebook session exchange successful');
       
-      // Parse Facebook user data
-      const firstName = data.user.user_metadata?.first_name || '';
-      const lastName = data.user.user_metadata?.last_name || '';
-
-      const sessionData = {
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-        expires_at: data.session.expires_at,
-        user: {
-          id: data.user.id,
-          email: data.user.email,
-          firstName: firstName,
-          lastName: lastName,
-          phoneNumber: data.user.user_metadata?.phone_number || '',
-          avatar: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || ''
-        }
-      };
-
+      const sessionData = createSessionData(data);
       const encoded = Buffer.from(JSON.stringify(sessionData)).toString('base64');
       
-      return res.redirect(`/?auth_success=true&session=${encoded}&provider=facebook`);
+      return res.redirect(`${FRONTEND_URL}/?auth_success=true&session=${encoded}&provider=facebook`);
       
     } catch (err) {
       console.error('Facebook callback error:', err);
-      return res.redirect(`/?error=callback_exception&details=${encodeURIComponent(err.message)}`);
+      return res.redirect(`${FRONTEND_URL}/?error=callback_exception&details=${encodeURIComponent(err.message)}`);
     }
   }
 
   // Handle client-side flow (redirect to frontend to process fragment)
-  if (!code && !access_token) {
-    console.log('No code or access_token for Facebook, redirecting to frontend to handle fragment');
-    return res.redirect('/?auth_flow=client_side&provider=facebook');
+  if (!code) {
+    console.log('No code for Facebook, redirecting to frontend to handle fragment');
+    return res.redirect(`${FRONTEND_URL}/?auth_flow=client_side&provider=facebook`);
   }
 
   // If we have tokens directly (shouldn't happen in server flow, but just in case)
   console.log('Unexpected token parameters in Facebook server callback');
-  return res.redirect('/?error=unexpected_flow&provider=facebook');
+  return res.redirect(`${FRONTEND_URL}/?error=unexpected_flow&provider=facebook`);
 });
 
-
-
-// Profile management endpoints
-app.get('/api/profiles', authenticateUser, async (req, res) => {
-  try {
-    // This endpoint might not be needed for your use case
-    // but keeping it as it was in your original API service
-    res.json([req.user]);
-  } catch (err) {
-    console.error('Get profiles error:', err);
-    res.status(500).json({ error: 'სერვერის შეცდომა' });
-  }
-});
-
-app.put('/api/profiles/me', authenticateUser, async (req, res) => {
-  try {
-    const { firstName, lastName, phoneNumber, gender, dateOfBirth } = req.body;
-    const userId = req.user.id;
-
-    console.log('Updating profile for user:', userId, {
-      firstName,
-      lastName,
-      phoneNumber,
-      gender,
-      dateOfBirth
-    });
-
-    // Update user metadata in Supabase Auth
-    const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-      user_metadata: {
-        first_name: firstName?.trim(),
-        last_name: lastName?.trim(),
-        phone_number: phoneNumber?.trim(),
-        gender: gender,
-        date_of_birth: dateOfBirth,
-      }
-    });
-
-    if (error) {
-      console.error('Profile update error:', error);
-      return res.status(400).json({ error: error.message });
-    }
-
-    console.log('Profile updated successfully:', data.user.user_metadata);
-
-    res.json({
-      success: true,
-      message: 'პროფილი წარმატებით განახლდა',
-      user: {
-        id: data.user.id,
-        email: data.user.email,
-        firstName: data.user.user_metadata.first_name || '',
-        lastName: data.user.user_metadata.last_name || '',
-        phoneNumber: data.user.user_metadata.phone_number || '',
-        gender: data.user.user_metadata.gender || '',
-        dateOfBirth: data.user.user_metadata.date_of_birth || '',
-      }
-    });
-
-  } catch (err) {
-    console.error('Profile update error:', err);
-    res.status(500).json({ error: 'სერვერის შეცდომა' });
-  }
-});
-
-
-
-// Request password reset (send email)
-app.post('/api/auth/forgot-password', async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'ელ-ფოსტა სავალდებულოა' });
-
-    // Use Supabase's built-in password reset with proper redirect
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${req.protocol}://${req.get('host')}/reset-password`,
-    });
-
-    if (error) {
-      console.error('Supabase password reset error:', error);
-      return res.status(400).json({ 
-        error: error.message || 'პაროლის აღდგენის ლინკის გაგზავნა ვერ მოხერხდა' 
-      });
-    }
-
-    res.json({ 
-      success: true, 
-      message: 'თუ ეს ელ-ფოსტის მისამართი რეგისტრირებულია, თქვენ მიიღებთ პაროლის აღდგენის ლინკს' 
-    });
-
-  } catch (err) {
-    console.error('Forgot password error:', err);
-    res.status(500).json({ error: 'სერვერის შეცდომა' });
-  }
-});
-
-// Handle the redirect from Supabase password reset email
+// Updated password reset redirect
 app.get('/reset-password', (req, res) => {
   try {
     console.log('=== Supabase Password Reset Redirect ===');
     console.log('Query params:', req.query);
-    console.log('Full URL:', req.url);
+    console.log('Frontend URL:', FRONTEND_URL);
 
-    // Supabase sends these parameters in query for some flows
     const { 
       access_token, 
       expires_in, 
@@ -882,13 +757,13 @@ app.get('/reset-password', (req, res) => {
     // Handle errors from Supabase
     if (error) {
       console.error('Supabase password reset error:', error, error_description);
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/?error=${encodeURIComponent(error)}&message=${encodeURIComponent(error_description || '')}`);
+      return res.redirect(`${FRONTEND_URL}/?error=${encodeURIComponent(error)}&message=${encodeURIComponent(error_description || '')}`);
     }
 
     // Check if we have tokens in query params (server-side flow)
     if (access_token && type === 'recovery') {
       console.log('Found password reset tokens in query params');
-      const frontendUrl = new URL(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/update-password`);
+      const frontendUrl = new URL(`${FRONTEND_URL}/update-password`);
       frontendUrl.searchParams.set('access_token', access_token);
       frontendUrl.searchParams.set('refresh_token', refresh_token || '');
       frontendUrl.searchParams.set('expires_in', expires_in || '3600');
@@ -952,10 +827,11 @@ app.get('/reset-password', (req, res) => {
         </div>
 
         <script>
+            const FRONTEND_URL = '${FRONTEND_URL}';
+            
             console.log('Password reset handler loaded');
             console.log('Current URL:', window.location.href);
-            console.log('Hash:', window.location.hash);
-            console.log('Search:', window.location.search);
+            console.log('Frontend URL:', FRONTEND_URL);
 
             function handlePasswordReset() {
                 try {
@@ -972,21 +848,15 @@ app.get('/reset-password', (req, res) => {
                         const error = hashParams.get('error');
                         const error_description = hashParams.get('error_description');
 
-                        console.log('Hash params:', { 
-                            access_token: access_token ? access_token.substring(0, 10) + '...' : 'MISSING',
-                            type: type,
-                            error: error
-                        });
-
                         if (error) {
                             console.error('Error in hash:', error, error_description);
-                            window.location.href = '/?error=' + encodeURIComponent(error);
+                            window.location.href = FRONTEND_URL + '/?error=' + encodeURIComponent(error);
                             return;
                         }
 
                         if (access_token && type === 'recovery') {
                             console.log('Valid recovery tokens found in hash, redirecting...');
-                            const frontendUrl = new URL('/update-password', window.location.origin);
+                            const frontendUrl = new URL('/update-password', FRONTEND_URL);
                             frontendUrl.searchParams.set('access_token', access_token);
                             frontendUrl.searchParams.set('refresh_token', refresh_token || '');
                             frontendUrl.searchParams.set('expires_in', expires_in || '3600');
@@ -1007,13 +877,13 @@ app.get('/reset-password', (req, res) => {
 
                     if (error) {
                         console.error('Error in query params:', error);
-                        window.location.href = '/?error=' + encodeURIComponent(error);
+                        window.location.href = FRONTEND_URL + '/?error=' + encodeURIComponent(error);
                         return;
                     }
 
                     if (access_token && type === 'recovery') {
                         console.log('Valid recovery tokens found in query params, redirecting...');
-                        window.location.href = '/update-password' + window.location.search;
+                        window.location.href = FRONTEND_URL + '/update-password' + window.location.search;
                         return;
                     }
 
@@ -1023,7 +893,7 @@ app.get('/reset-password', (req, res) => {
                     document.getElementById('error').textContent = 'არასწორი ან ვადაგასული ლინკი';
                     
                     setTimeout(() => {
-                        window.location.href = '/?error=invalid_reset_link';
+                        window.location.href = FRONTEND_URL + '/?error=invalid_reset_link';
                     }, 3000);
 
                 } catch (err) {
@@ -1032,7 +902,7 @@ app.get('/reset-password', (req, res) => {
                     document.getElementById('error').textContent = 'შეცდომა: ' + err.message;
                     
                     setTimeout(() => {
-                        window.location.href = '/?error=processing_error';
+                        window.location.href = FRONTEND_URL + '/?error=processing_error';
                     }, 3000);
                 }
             }
@@ -1048,7 +918,7 @@ app.get('/reset-password', (req, res) => {
     
   } catch (err) {
     console.error('Reset password redirect error:', err);
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/?error=server_error`);
+    res.redirect(`${FRONTEND_URL}/?error=server_error`);
   }
 });
 
