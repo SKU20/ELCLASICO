@@ -40,13 +40,16 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // Helper function to get the correct redirect URL
 const getRedirectUrl = (req, provider) => {
-  // Use environment variable if available, otherwise construct from request
-  if (NODE_ENV === 'production' && BACKEND_URL !== 'http://localhost:3000') {
+  // Always use BACKEND_URL if it's set to a non-localhost value
+  if (BACKEND_URL && BACKEND_URL !== 'http://localhost:3000') {
+    console.log(`Using BACKEND_URL for ${provider} callback:`, BACKEND_URL);
     return `${BACKEND_URL}/api/auth/callback/${provider}`;
   }
   
-  // For development or fallback
-  return `${req.protocol}://${req.get('host')}/api/auth/callback/${provider}`;
+  // For development, use request host
+  const redirectUrl = `${req.protocol}://${req.get('host')}/api/auth/callback/${provider}`;
+  console.log(`Using request host for ${provider} callback:`, redirectUrl);
+  return redirectUrl;
 };
 
 // ES6 module equivalent of __dirname

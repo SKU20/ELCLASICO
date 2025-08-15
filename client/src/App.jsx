@@ -11,21 +11,32 @@ import UpdatePasswordPage from './components/UpdatePasswordPage';
 import CartPage from './components/CartPage';
 import SearchResults from './components/SearchResults';
 
+const containerStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  width: '100%',
+  maxWidth: '1200px',
+  margin: '0 auto',
+  overflowX: 'hidden',
+  padding: '0 1rem',
+  boxSizing: 'border-box'
+};
+
 const ScrollToTop = () => {
   const { pathname } = useLocation();
-
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [pathname]);
-
   return null;
 };
 
-// Page components with their own header/footer
 const HomePage = ({ allProducts, productsLoading }) => (
   <>
     <Header allProducts={allProducts} />
-    <MainLayout allProducts={allProducts} productsLoading={productsLoading} />
+    <div style={containerStyle}>
+      <MainLayout allProducts={allProducts} productsLoading={productsLoading} />
+    </div>
     <Footer />
   </>
 );
@@ -33,7 +44,7 @@ const HomePage = ({ allProducts, productsLoading }) => (
 const LoginPage = () => (
   <>
     <Header />
-    <div style={{ padding: '2rem', minHeight: '60vh' }}>
+    <div style={{ ...containerStyle, padding: '2rem 1rem', minHeight: '60vh' }}>
       <h1>ავტორიზაცია</h1>
       <p>მიმდინარეობს მონაცემების შეყვანა...</p>
     </div>
@@ -44,7 +55,7 @@ const LoginPage = () => (
 const SignupPage = () => (
   <>
     <Header />
-    <div style={{ padding: '2rem', minHeight: '60vh' }}>
+    <div style={{ ...containerStyle, padding: '2rem 1rem', minHeight: '60vh' }}>
       <h1>ავტორიზაცია</h1>
       <p>მიმდინარეობს მონაცემების შეყვანა...</p>
     </div>
@@ -52,11 +63,12 @@ const SignupPage = () => (
   </>
 );
 
-// FIXED: SearchResults now has Header and Footer
 const SearchResultsPage = ({ allProducts }) => (
   <>
     <Header allProducts={allProducts} />
-    <SearchResults allProducts={allProducts} />
+    <div style={containerStyle}>
+      <SearchResults allProducts={allProducts} />
+    </div>
     <Footer />
   </>
 );
@@ -64,7 +76,7 @@ const SearchResultsPage = ({ allProducts }) => (
 const CheckoutPage = () => (
   <>
     <Header />
-    <div style={{ padding: '2rem', minHeight: '60vh' }}>
+    <div style={{ ...containerStyle, padding: '2rem 1rem', minHeight: '60vh' }}>
       <h1>Checkout</h1>
       <p>Checkout page coming soon...</p>
     </div>
@@ -75,14 +87,17 @@ const CheckoutPage = () => (
 const CartPageWithLayout = () => (
   <>
     <Header />
-    <CartPage />
+    <div style={containerStyle}>
+      <CartPage />
+    </div>
     <Footer />
   </>
 );
 
 const NotFoundPage = () => (
   <div style={{
-    padding: '2rem',
+    ...containerStyle,
+    padding: '2rem 1rem',
     textAlign: 'center',
     minHeight: '50vh',
     display: 'flex',
@@ -112,7 +127,9 @@ const NotFoundPage = () => (
 const ProductPageWithLayout = ({ allProducts }) => (
   <>
     <Header allProducts={allProducts} />
-    <ProductPage />
+    <div style={containerStyle}>
+      <ProductPage />
+    </div>
     <Footer />
   </>
 );
@@ -150,24 +167,24 @@ const AppContent = () => {
   }, []);
 
   return (
-    <Routes>
-      <Route path="/" element={<HomePage allProducts={allProducts} productsLoading={productsLoading} />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
-      <Route 
-        path="/product/:productId" 
-        element={<ProductPageWithLayout allProducts={allProducts} />} 
-      />
-      <Route path="/cart" element={<CartPageWithLayout />} />
-      <Route path="/checkout" element={<CheckoutPage />} />
-      {/* FIXED: Now uses SearchResultsPage wrapper with Header and Footer */}
-      <Route 
-        path="/results" 
-        element={<SearchResultsPage allProducts={allProducts} />} 
-      />
-      <Route path="/update-password" element={<UpdatePasswordPage />} />
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+    <div style={{ 
+      overflowX: 'hidden', 
+      width: '100%', 
+      maxWidth: '100vw',
+      boxSizing: 'border-box'
+    }}>
+      <Routes>
+        <Route path="/" element={<HomePage allProducts={allProducts} productsLoading={productsLoading} />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/product/:productId" element={<ProductPageWithLayout allProducts={allProducts} />} />
+        <Route path="/cart" element={<CartPageWithLayout />} />
+        <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/results" element={<SearchResultsPage allProducts={allProducts} />} />
+        <Route path="/update-password" element={<UpdatePasswordPage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </div>
   );
 };
 
