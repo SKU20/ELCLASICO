@@ -5,68 +5,43 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 
-// Load environment variables first
 dotenv.config();
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// ADD THESE NEW ENVIRONMENT VARIABLES:
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
 const NODE_ENV = process.env.NODE_ENV || 'development';
-
-// Log environment info for debugging
-console.log('Environment Configuration:', {
-  NODE_ENV: NODE_ENV,
-  FRONTEND_URL: FRONTEND_URL,
-  BACKEND_URL: BACKEND_URL,
-  SUPABASE_URL: SUPABASE_URL ? 'SET' : 'NOT SET',
-  SUPABASE_ANON_KEY: SUPABASE_ANON_KEY ? 'SET' : 'NOT SET',
-  SUPABASE_SERVICE_ROLE_KEY: SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET'
-});
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Missing Supabase environment variables. Please check your .env file.');
   process.exit(1);
 }
 
-// Regular client (for public operations)
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// Admin client (bypasses RLS)
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Helper function to get the correct redirect URL
 const getRedirectUrl = (req, provider) => {
-  // Always use BACKEND_URL if it's set to a non-localhost value
   if (BACKEND_URL && BACKEND_URL !== 'http://localhost:3000') {
-    console.log(`Using BACKEND_URL for ${provider} callback:`, BACKEND_URL);
     return `${BACKEND_URL}/api/auth/callback/${provider}`;
   }
   
-  // For development, use request host
-  const redirectUrl = `${req.protocol}://${req.get('host')}/api/auth/callback/${provider}`;
-  console.log(`Using request host for ${provider} callback:`, redirectUrl);
-  return redirectUrl;
+  return `${req.protocol}://${req.get('host')}/api/auth/callback/${provider}`;
 };
 
-// ES6 module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Helper function to authenticate user from token
 const authenticateUser = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -88,7 +63,6 @@ const authenticateUser = async (req, res, next) => {
   }
 };
 
-// API Routes
 app.get('/api/products', async (req, res) => {
   try {
     const { data, error } = await supabase.from('products').select('*');
@@ -102,8 +76,6 @@ app.get('/api/products', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-
 
 app.get('/api/products/bestsellers', async (req, res) => {
   try {
@@ -122,6 +94,7 @@ app.get('/api/products/bestsellers', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
 app.get('/api/products/available-sizes', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -133,7 +106,6 @@ app.get('/api/products/available-sizes', async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
     
-    // Parse and collect all unique sizes
     const allSizes = new Set();
     
     data.forEach(product => {
@@ -141,19 +113,16 @@ app.get('/api/products/available-sizes', async (req, res) => {
         try {
           let parsedSizes = [];
           
-          // Handle different formats
           if (typeof product.sizes === 'string') {
             try {
               parsedSizes = JSON.parse(product.sizes);
             } catch (jsonError) {
-              // If JSON parsing fails, treat as comma-separated string
               parsedSizes = product.sizes.split(',').map(size => size.trim());
             }
           } else if (Array.isArray(product.sizes)) {
             parsedSizes = product.sizes;
           }
           
-          // Add each size to the set
           parsedSizes.forEach(size => {
             if (size && size !== '') {
               allSizes.add(size.toString().trim());
@@ -166,17 +135,14 @@ app.get('/api/products/available-sizes', async (req, res) => {
       }
     });
     
-    // Convert to array and sort numerically
     const sortedSizes = Array.from(allSizes).sort((a, b) => {
       const numA = parseFloat(a);
       const numB = parseFloat(b);
       
-      // If both are valid numbers, sort numerically
       if (!isNaN(numA) && !isNaN(numB)) {
         return numA - numB;
       }
       
-      // If one or both are not numbers, sort alphabetically
       return a.localeCompare(b);
     });
     
@@ -192,7 +158,6 @@ app.get('/api/products/available-sizes', async (req, res) => {
   }
 });
 
-// Update the existing filter endpoint to support size filtering
 app.get('/api/products/filter', async (req, res) => {
   try {
     const { brands, genders, types, sizes } = req.query;
@@ -214,14 +179,12 @@ app.get('/api/products/filter', async (req, res) => {
       query = query.in('type', typesArray);
     }
     
-    // Get all products first, then filter by sizes if needed
     const { data, error } = await query;
     
     if (error) {
       return res.status(400).json({ error: error.message });
     }
     
-    // Filter by sizes if specified
     let filteredData = data;
     if (sizes) {
       const requestedSizes = sizes.split(',').map(s => s.trim());
@@ -232,7 +195,6 @@ app.get('/api/products/filter', async (req, res) => {
         try {
           let productSizes = [];
           
-          // Parse product sizes
           if (typeof product.sizes === 'string') {
             try {
               productSizes = JSON.parse(product.sizes);
@@ -243,7 +205,6 @@ app.get('/api/products/filter', async (req, res) => {
             productSizes = product.sizes;
           }
           
-          // Check if any requested size matches any product size
           return requestedSizes.some(requestedSize => 
             productSizes.some(productSize => 
               productSize.toString().trim() === requestedSize
@@ -251,7 +212,6 @@ app.get('/api/products/filter', async (req, res) => {
           );
           
         } catch (parseError) {
-          console.error('Error parsing product sizes for filtering:', parseError);
           return false;
         }
       });
@@ -259,10 +219,10 @@ app.get('/api/products/filter', async (req, res) => {
     
     res.json(filteredData);
   } catch (err) {
-    console.error('Filter products error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
 app.get('/api/product-images', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -273,7 +233,6 @@ app.get('/api/product-images', async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
     
-    // Transform data into a map for easier frontend usage
     const imagesMap = {};
     data.forEach(img => {
       imagesMap[img.product_id] = img.image_url;
@@ -289,27 +248,22 @@ app.get('/api/product-images/:productId', async (req, res) => {
   try {
     const { productId } = req.params;
 
-    // Use `select('*')` to get all images for the product
     const { data, error } = await supabase
       .from('product_images')
       .select('image_url')
       .eq('product_id', productId);
 
     if (error) {
-      console.error('Supabase error:', error);
       return res.status(400).json({ error: error.message });
     }
 
-    // If no images are found, return an empty array
     if (!data || data.length === 0) {
       return res.json([]);
     }
 
-    // Return the array of image URLs
     const imageUrls = data.map(item => item.image_url);
     res.json(imageUrls);
   } catch (err) {
-    console.error('Server error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -322,12 +276,10 @@ app.get('/api/offer-images', async (req, res) => {
       .order('created_at', { ascending: false });
     
     if (error) {
-      console.error('Supabase error:', error);
       return res.status(400).json({ error: error.message });
     }
     res.json(data);
   } catch (err) {
-    console.error('Server error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -342,7 +294,6 @@ app.get('/api/filters/options', async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
     
-    // Process the data to get counts for each filter option
     const brandCount = {};
     const genderCount = {};
     const typeCount = {};
@@ -359,7 +310,6 @@ app.get('/api/filters/options', async (req, res) => {
       }
     });
 
-    // Combine all filter options into one array with category info
     const combinedOptions = [
       ...Object.entries(genderCount).map(([name, count]) => ({ 
         name, 
@@ -387,26 +337,20 @@ app.get('/api/filters/options', async (req, res) => {
     });
     
   } catch (err) {
-    console.error('Server error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Authentication Routes
-
-// Sign up endpoint
 app.post('/api/auth/signup', async (req, res) => {
   try {
     const { email, password, firstName, lastName, phoneNumber, gender, dateOfBirth } = req.body;
 
-    // Validate required fields
     if (!email || !password || !firstName || !lastName || !gender || !dateOfBirth) {
       return res.status(400).json({ 
         error: 'ყველა სავალდებულო ველი უნდა იყოს შევსებული' 
       });
     }
 
-    // Sign up user with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -422,11 +366,9 @@ app.post('/api/auth/signup', async (req, res) => {
     });
 
     if (authError) {
-      console.error('Auth error:', authError);
       return res.status(400).json({ error: authError.message });
     }
 
-    // If user was created successfully but needs email confirmation
     if (authData.user && !authData.session) {
       return res.status(201).json({
         success: true,
@@ -439,7 +381,6 @@ app.post('/api/auth/signup', async (req, res) => {
       });
     }
 
-    // If user was created and auto-confirmed
     if (authData.user && authData.session) {
       return res.status(201).json({
         success: true,
@@ -460,12 +401,10 @@ app.post('/api/auth/signup', async (req, res) => {
     return res.status(400).json({ error: 'რეგისტრაცია ვერ მოხერხდა' });
 
   } catch (err) {
-    console.error('Signup error:', err);
     res.status(500).json({ error: 'სერვერის შეცდომა' });
   }
 });
 
-// Login endpoint
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -482,7 +421,6 @@ app.post('/api/auth/login', async (req, res) => {
     });
 
     if (error) {
-      console.error('Login error:', error);
       return res.status(400).json({ 
         error: 'არასწორი ელ-ფოსტა ან პაროლი' 
       });
@@ -511,12 +449,10 @@ app.post('/api/auth/login', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Login error:', err);
     res.status(500).json({ error: 'სერვერის შეცდომა' });
   }
 });
 
-// Logout endpoint
 app.post('/api/auth/logout', authenticateUser, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -526,19 +462,15 @@ app.post('/api/auth/logout', authenticateUser, async (req, res) => {
 
     if (error) {
       console.error('Logout error:', error);
-      // Don't return error, as the token might already be invalid
     }
 
     res.json({ success: true, message: 'წარმატებით გახვედით სისტემიდან' });
 
   } catch (err) {
-    console.error('Logout error:', err);
-    // Still return success as the client should clear local storage anyway
     res.json({ success: true, message: 'გასვლა დასრულდა' });
   }
 });
 
-// Get current user endpoint
 app.get('/api/auth/user', authenticateUser, async (req, res) => {
   try {
     const user = req.user;
@@ -555,26 +487,18 @@ app.get('/api/auth/user', authenticateUser, async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Get user error:', err);
     res.status(500).json({ error: 'სერვერის შეცდომა' });
   }
 });
 
-// Google OAuth initiation route - Updated
 app.get('/api/auth/google', async (req, res) => {
   try {
-    console.log('=== Initiating Google OAuth ===');
-    console.log('Environment:', process.env.NODE_ENV);
-    console.log('Backend URL:', BACKEND_URL);
-    
     const redirectUrl = getRedirectUrl(req, 'google');
-    console.log('Using redirect URL:', redirectUrl);
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
-        // Force server-side flow
         flowType: 'pkce',
         queryParams: {
           access_type: 'offline',
@@ -583,102 +507,89 @@ app.get('/api/auth/google', async (req, res) => {
       }
     });
 
-    console.log('Google OAuth initiation result:', { data, error });
-
     if (error) {
-      console.error('Google OAuth initiation error:', error);
       return res.status(400).json({ error: error.message });
     }
 
     if (!data.url) {
-      console.error('No OAuth URL received from Supabase');
       return res.status(400).json({ error: 'OAuth URL not generated' });
     }
 
-    console.log('Redirecting to Google OAuth URL:', data.url);
     res.redirect(data.url);
     
   } catch (err) {
-    console.error('Google OAuth route error:', err);
     res.status(500).json({ error: 'OAuth initiation failed' });
   }
 });
 
-// Facebook OAuth route - Updated
 app.get('/api/auth/facebook', async (req, res) => {
-  console.log('=== Initiating Facebook OAuth ===');
-  console.log('Environment:', process.env.NODE_ENV);
-  
   try {
     const redirectUrl = getRedirectUrl(req, 'facebook');
-    console.log('Using redirect URL:', redirectUrl);
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'facebook',
       options: {
         redirectTo: redirectUrl,
-        // Force server-side flow with explicit parameters
         flowType: 'pkce',
         scopes: 'email,public_profile',
         queryParams: {
-          response_type: 'code', // Explicitly request code flow
+          response_type: 'code',
           access_type: 'offline'
         }
       }
     });
 
-    console.log('Facebook OAuth initiation result:', { data, error });
-
     if (error) {
-      console.error('Facebook OAuth initiation error:', error);
       return res.status(400).json({ error: error.message });
     }
 
     if (!data.url) {
-      console.error('No OAuth URL received from Supabase');
       return res.status(400).json({ error: 'OAuth URL not generated' });
     }
 
-    console.log('Redirecting to Facebook OAuth URL:', data.url);
     res.redirect(data.url);
     
   } catch (err) {
-    console.error('Facebook OAuth route error:', err);
     res.status(500).json({ error: 'OAuth initiation failed' });
   }
 });
 
-// Google OAuth callback - Updated with better error handling
+const createSessionData = (data) => ({
+  user: {
+    id: data.user.id,
+    email: data.user.email,
+    firstName: data.user.user_metadata?.first_name || data.user.user_metadata?.given_name || '',
+    lastName: data.user.user_metadata?.last_name || data.user.user_metadata?.family_name || '',
+    phoneNumber: data.user.user_metadata?.phone_number || '',
+    gender: data.user.user_metadata?.gender || '',
+    dateOfBirth: data.user.user_metadata?.date_of_birth || '',
+    avatar: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || ''
+  },
+  session: {
+    access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token,
+    expires_at: data.session.expires_at
+  }
+});
+
 app.get('/api/auth/callback/google', async (req, res) => {
-  console.log('=== Google OAuth Callback ===');
-  console.log('Query params:', req.query);
-  console.log('Full URL:', req.url);
-  console.log('Frontend URL:', FRONTEND_URL);
-  
   const { code, error, error_description } = req.query;
 
   if (error) {
-    console.error('OAuth error from Google:', error, error_description);
     return res.redirect(`${FRONTEND_URL}/?error=google_oauth_error&details=${encodeURIComponent(error_description || error)}`);
   }
 
-  // Handle server-side flow (with authorization code)
   if (code) {
     try {
-      console.log('Processing server-side flow with authorization code...');
       const { data, error: supabaseError } = await supabase.auth.exchangeCodeForSession(code);
 
       if (supabaseError) {
-        console.error('Supabase session exchange error:', supabaseError);
         return res.redirect(`${FRONTEND_URL}/?error=session_exchange_failed&details=${encodeURIComponent(supabaseError.message)}`);
       }
 
       if (!data.session || !data.user) {
-        console.error('No session or user data received');
         return res.redirect(`${FRONTEND_URL}/?error=incomplete_session_data`);
       }
-
-      console.log('Session exchange successful');
       
       const sessionData = createSessionData(data);
       const encoded = Buffer.from(JSON.stringify(sessionData)).toString('base64');
@@ -686,53 +597,35 @@ app.get('/api/auth/callback/google', async (req, res) => {
       return res.redirect(`${FRONTEND_URL}/?auth_success=true&session=${encoded}&provider=google`);
       
     } catch (err) {
-      console.error('Google callback error:', err);
       return res.redirect(`${FRONTEND_URL}/?error=callback_exception&details=${encodeURIComponent(err.message)}`);
     }
   }
 
-  // Handle client-side flow (redirect to frontend to process fragment)
   if (!code) {
-    console.log('No code, redirecting to frontend to handle fragment');
     return res.redirect(`${FRONTEND_URL}/?auth_flow=client_side&provider=google`);
   }
 
-  // If we have tokens directly (shouldn't happen in server flow, but just in case)
-  console.log('Unexpected token parameters in server callback');
   return res.redirect(`${FRONTEND_URL}/?error=unexpected_flow&provider=google`);
 });
 
-// Facebook OAuth callback - Updated with better error handling
 app.get('/api/auth/callback/facebook', async (req, res) => {
-  console.log('=== Facebook OAuth Callback ===');
-  console.log('Query params:', req.query);
-  console.log('Full URL:', req.url);
-  console.log('Frontend URL:', FRONTEND_URL);
-  
   const { code, error, error_description } = req.query;
 
   if (error) {
-    console.error('OAuth error from Facebook:', error, error_description);
     return res.redirect(`${FRONTEND_URL}/?error=facebook_oauth_error&details=${encodeURIComponent(error_description || error)}`);
   }
 
-  // Handle server-side flow (with authorization code)
   if (code) {
     try {
-      console.log('Processing server-side Facebook flow with authorization code...');
       const { data, error: supabaseError } = await supabase.auth.exchangeCodeForSession(code);
 
       if (supabaseError) {
-        console.error('Supabase session exchange error:', supabaseError);
         return res.redirect(`${FRONTEND_URL}/?error=session_exchange_failed&details=${encodeURIComponent(supabaseError.message)}`);
       }
 
       if (!data.session || !data.user) {
-        console.error('No session or user data received');
         return res.redirect(`${FRONTEND_URL}/?error=incomplete_session_data`);
       }
-
-      console.log('Facebook session exchange successful');
       
       const sessionData = createSessionData(data);
       const encoded = Buffer.from(JSON.stringify(sessionData)).toString('base64');
@@ -740,29 +633,19 @@ app.get('/api/auth/callback/facebook', async (req, res) => {
       return res.redirect(`${FRONTEND_URL}/?auth_success=true&session=${encoded}&provider=facebook`);
       
     } catch (err) {
-      console.error('Facebook callback error:', err);
       return res.redirect(`${FRONTEND_URL}/?error=callback_exception&details=${encodeURIComponent(err.message)}`);
     }
   }
 
-  // Handle client-side flow (redirect to frontend to process fragment)
   if (!code) {
-    console.log('No code for Facebook, redirecting to frontend to handle fragment');
     return res.redirect(`${FRONTEND_URL}/?auth_flow=client_side&provider=facebook`);
   }
 
-  // If we have tokens directly (shouldn't happen in server flow, but just in case)
-  console.log('Unexpected token parameters in Facebook server callback');
   return res.redirect(`${FRONTEND_URL}/?error=unexpected_flow&provider=facebook`);
 });
 
-// Updated password reset redirect
 app.get('/reset-password', (req, res) => {
   try {
-    console.log('=== Supabase Password Reset Redirect ===');
-    console.log('Query params:', req.query);
-    console.log('Frontend URL:', FRONTEND_URL);
-
     const { 
       access_token, 
       expires_in, 
@@ -773,15 +656,11 @@ app.get('/reset-password', (req, res) => {
       error_description 
     } = req.query;
 
-    // Handle errors from Supabase
     if (error) {
-      console.error('Supabase password reset error:', error, error_description);
       return res.redirect(`${FRONTEND_URL}/?error=${encodeURIComponent(error)}&message=${encodeURIComponent(error_description || '')}`);
     }
 
-    // Check if we have tokens in query params (server-side flow)
     if (access_token && type === 'recovery') {
-      console.log('Found password reset tokens in query params');
       const frontendUrl = new URL(`${FRONTEND_URL}/update-password`);
       frontendUrl.searchParams.set('access_token', access_token);
       frontendUrl.searchParams.set('refresh_token', refresh_token || '');
@@ -789,12 +668,8 @@ app.get('/reset-password', (req, res) => {
       frontendUrl.searchParams.set('token_type', token_type || 'bearer');
       frontendUrl.searchParams.set('type', type);
 
-      console.log('Redirecting to frontend with query tokens:', frontendUrl.toString());
       return res.redirect(frontendUrl.toString());
     }
-
-    // If no tokens in query params, send an HTML page that can handle fragment-based tokens
-    console.log('No tokens in query params, serving HTML page to handle fragments');
     
     const html = `
     <!DOCTYPE html>
@@ -848,15 +723,9 @@ app.get('/reset-password', (req, res) => {
         <script>
             const FRONTEND_URL = '${FRONTEND_URL}';
             
-            console.log('Password reset handler loaded');
-            console.log('Current URL:', window.location.href);
-            console.log('Frontend URL:', FRONTEND_URL);
-
             function handlePasswordReset() {
                 try {
-                    // Check URL hash for tokens (most common case)
                     if (window.location.hash) {
-                        console.log('Processing hash-based tokens...');
                         const hashParams = new URLSearchParams(window.location.hash.slice(1));
                         
                         const access_token = hashParams.get('access_token');
@@ -868,13 +737,11 @@ app.get('/reset-password', (req, res) => {
                         const error_description = hashParams.get('error_description');
 
                         if (error) {
-                            console.error('Error in hash:', error, error_description);
                             window.location.href = FRONTEND_URL + '/?error=' + encodeURIComponent(error);
                             return;
                         }
 
                         if (access_token && type === 'recovery') {
-                            console.log('Valid recovery tokens found in hash, redirecting...');
                             const frontendUrl = new URL('/update-password', FRONTEND_URL);
                             frontendUrl.searchParams.set('access_token', access_token);
                             frontendUrl.searchParams.set('refresh_token', refresh_token || '');
@@ -882,32 +749,26 @@ app.get('/reset-password', (req, res) => {
                             frontendUrl.searchParams.set('token_type', token_type || 'bearer');
                             frontendUrl.searchParams.set('type', type);
                             
-                            console.log('Redirecting to:', frontendUrl.toString());
                             window.location.href = frontendUrl.toString();
                             return;
                         }
                     }
 
-                    // Check query parameters as fallback
                     const urlParams = new URLSearchParams(window.location.search);
                     const access_token = urlParams.get('access_token');
                     const type = urlParams.get('type');
                     const error = urlParams.get('error');
 
                     if (error) {
-                        console.error('Error in query params:', error);
                         window.location.href = FRONTEND_URL + '/?error=' + encodeURIComponent(error);
                         return;
                     }
 
                     if (access_token && type === 'recovery') {
-                        console.log('Valid recovery tokens found in query params, redirecting...');
                         window.location.href = FRONTEND_URL + '/update-password' + window.location.search;
                         return;
                     }
 
-                    // No valid tokens found
-                    console.error('No valid password reset tokens found');
                     document.getElementById('error').style.display = 'block';
                     document.getElementById('error').textContent = 'არასწორი ან ვადაგასული ლინკი';
                     
@@ -916,7 +777,6 @@ app.get('/reset-password', (req, res) => {
                     }, 3000);
 
                 } catch (err) {
-                    console.error('Error processing password reset:', err);
                     document.getElementById('error').style.display = 'block';
                     document.getElementById('error').textContent = 'შეცდომა: ' + err.message;
                     
@@ -926,7 +786,6 @@ app.get('/reset-password', (req, res) => {
                 }
             }
 
-            // Run immediately and also after a short delay
             handlePasswordReset();
             setTimeout(handlePasswordReset, 500);
         </script>
@@ -936,7 +795,6 @@ app.get('/reset-password', (req, res) => {
     res.send(html);
     
   } catch (err) {
-    console.error('Reset password redirect error:', err);
     res.redirect(`${FRONTEND_URL}/?error=server_error`);
   }
 });
@@ -944,11 +802,6 @@ app.get('/reset-password', (req, res) => {
 app.post('/api/auth/update-password', async (req, res) => {
   try {
     const { access_token, new_password } = req.body;
-
-    console.log('Update password request:', {
-      access_token: access_token ? access_token.substring(0, 10) + '...' : 'MISSING',
-      new_password: new_password ? '***' : 'MISSING'
-    });
 
     if (!access_token || !new_password) {
       return res.status(400).json({ 
@@ -962,9 +815,6 @@ app.post('/api/auth/update-password', async (req, res) => {
       });
     }
 
-    console.log('Making direct API call to update password...');
-
-    // Make direct API call to Supabase
     const response = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
       method: 'PUT',
       headers: {
@@ -979,11 +829,6 @@ app.post('/api/auth/update-password', async (req, res) => {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('Direct API password update error:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorData
-      });
       
       return res.status(response.status).json({ 
         error: 'პაროლის განახლება ვერ მოხერხდა: ' + (
@@ -995,16 +840,12 @@ app.post('/api/auth/update-password', async (req, res) => {
       });
     }
 
-    const result = await response.json();
-    console.log('Password updated successfully via direct API for user:', result.id);
-
     res.json({ 
       success: true, 
       message: 'პაროლი წარმატებით განახლდა! გთხოვთ შეხვიდეთ ახალი პაროლით' 
     });
 
   } catch (err) {
-    console.error('Update password error:', err);
     res.status(500).json({ 
       error: 'სერვერის შეცდომა: ' + err.message 
     });
@@ -1019,11 +860,9 @@ app.post('/api/auth/exchange-reset-code', async (req, res) => {
       return res.status(400).json({ error: 'Authorization code is required' });
     }
 
-    console.log('Exchanging password reset code for session...');
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
-      console.error('Code exchange error:', error);
       return res.status(400).json({ error: error.message });
     }
 
@@ -1031,9 +870,6 @@ app.post('/api/auth/exchange-reset-code', async (req, res) => {
       return res.status(400).json({ error: 'No session received' });
     }
 
-    console.log('Password reset session exchange successful');
-
-    // Return the session data
     res.json({
       access_token: data.session.access_token,
       refresh_token: data.session.refresh_token,
@@ -1042,7 +878,6 @@ app.post('/api/auth/exchange-reset-code', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Exchange reset code error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1066,7 +901,6 @@ app.get('/api/products/:id', async (req, res) => {
     
     res.json(data);
   } catch (err) {
-    console.error('Error fetching product by ID:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1085,14 +919,12 @@ app.get('/api/products/:productId/reviews', async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
 
-    // Fetch user data for each review
     const reviewsWithUserData = await Promise.all(
       data.map(async (review) => {
         try {
           const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(review.profile_id);
           
           if (userError) {
-            console.error('Error fetching user for review:', userError);
             return {
               ...review,
               profiles: {
@@ -1102,7 +934,6 @@ app.get('/api/products/:productId/reviews', async (req, res) => {
             };
           }
 
-          // Get user metadata or use fallback
           const userMetadata = userData?.user?.user_metadata || {};
           
           return {
@@ -1113,7 +944,6 @@ app.get('/api/products/:productId/reviews', async (req, res) => {
             }
           };
         } catch (fetchError) {
-          console.error('Error in user data fetch:', fetchError);
           return {
             ...review,
             profiles: {
@@ -1127,7 +957,6 @@ app.get('/api/products/:productId/reviews', async (req, res) => {
 
     res.json(reviewsWithUserData);
   } catch (err) {
-    console.error('Error fetching reviews:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1137,9 +966,8 @@ app.post('/api/reviews', authenticateUser, async (req, res) => {
     const { product_id, review_text, star_count } = req.body;
     const user = req.user;
 
-    // ✅ Create a Supabase client with the user's token from the request
     const authHeader = req.headers.authorization;
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    const token = authHeader.substring(7);
     
     const userSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: {
@@ -1149,12 +977,6 @@ app.post('/api/reviews', authenticateUser, async (req, res) => {
       },
     });
 
-    console.log('Creating review for user:', {
-      userId: user.id,
-      email: user.email
-    });
-
-    // Validate required fields
     if (!product_id || !review_text || !star_count) {
       return res.status(400).json({ 
         error: 'პროდუქტი, კომენტარი და შეფასება სავალდებულოა' 
@@ -1167,7 +989,6 @@ app.post('/api/reviews', authenticateUser, async (req, res) => {
       });
     }
 
-    // Check if user has complete profile
     const firstName = user.user_metadata?.first_name || user.user_metadata?.given_name;
     const lastName = user.user_metadata?.last_name || user.user_metadata?.family_name;
 
@@ -1185,7 +1006,6 @@ app.post('/api/reviews', authenticateUser, async (req, res) => {
       });
     }
 
-    // Check if profile exists in profiles table, create if not
     const { data: existingProfile, error: profileCheckError } = await supabaseAdmin
       .from('profiles')
       .select('id')
@@ -1193,8 +1013,6 @@ app.post('/api/reviews', authenticateUser, async (req, res) => {
       .single();
 
     if (profileCheckError && profileCheckError.code === 'PGRST116') {
-      // Profile doesn't exist, create it
-      console.log('Creating profile for user:', user.id);
       const { error: profileCreateError } = await supabaseAdmin
         .from('profiles')
         .insert([{
@@ -1211,13 +1029,10 @@ app.post('/api/reviews', authenticateUser, async (req, res) => {
         }]);
 
       if (profileCreateError) {
-        console.error('Profile creation error:', profileCreateError);
         return res.status(400).json({ error: 'პროფილის შექმნა ვერ მოხერხდა' });
       }
-      console.log('Profile created successfully for user:', user.id);
     }
 
-    // Check for existing review
     const { data: existingReview } = await userSupabase
       .from('reviews')
       .select('id')
@@ -1231,11 +1046,10 @@ app.post('/api/reviews', authenticateUser, async (req, res) => {
       });
     }
 
-    // ✅ Create the review using the user's authenticated client
     const { data, error } = await userSupabase
       .from('reviews')
       .insert([{
-        profile_id: user.id,  // This should now work with RLS
+        profile_id: user.id,
         product_id: product_id,
         review_text: review_text.trim(),
         star_count: parseInt(star_count),
@@ -1245,11 +1059,8 @@ app.post('/api/reviews', authenticateUser, async (req, res) => {
       .single();
 
     if (error) {
-      console.error('Review creation error:', error);
       return res.status(400).json({ error: error.message });
     }
-
-    console.log('Review created successfully:', data);
 
     res.status(201).json({
       success: true,
@@ -1264,7 +1075,6 @@ app.post('/api/reviews', authenticateUser, async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Create review error:', err);
     res.status(500).json({ error: 'სერვერის შეცდომა' });
   }
 });
@@ -1274,11 +1084,8 @@ app.post('/api/reviews/:reviewId/helpful', authenticateUser, async (req, res) =>
     const { reviewId } = req.params;
     const user = req.user;
 
-    console.log('Processing helpful vote:', { reviewId, userId: user.id });
-
-    // ✅ Create authenticated Supabase client with user's token
     const authHeader = req.headers.authorization;
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    const token = authHeader.substring(7);
     
     const userSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: {
@@ -1288,7 +1095,6 @@ app.post('/api/reviews/:reviewId/helpful', authenticateUser, async (req, res) =>
       },
     });
 
-    // First, check if the review exists
     const { data: review, error: reviewError } = await userSupabase
       .from('reviews')
       .select('id, helpful_count, profile_id')
@@ -1296,30 +1102,25 @@ app.post('/api/reviews/:reviewId/helpful', authenticateUser, async (req, res) =>
       .single();
 
     if (reviewError || !review) {
-      console.error('Review fetch error:', reviewError);
       return res.status(404).json({ error: 'შეფასება ვერ მოიძებნა' });
     }
 
-    // Prevent users from marking their own reviews as helpful
     if (review.profile_id === user.id) {
       return res.status(400).json({ error: 'თქვენ ვერ შეფასებთ საკუთარ კომენტარს' });
     }
 
-    // Check if user has already voted on this review
     const { data: existingVote, error: voteCheckError } = await userSupabase
       .from('review_helpful_votes')
       .select('id')
       .eq('review_id', reviewId)
       .eq('user_id', user.id)
-      .maybeSingle(); // Use maybeSingle() instead of single() to avoid error when no rows
+      .maybeSingle();
 
     if (voteCheckError && voteCheckError.code !== 'PGRST116') {
-      console.error('Vote check error:', voteCheckError);
       return res.status(400).json({ error: 'ხმის შემოწმება ვერ მოხერხდა' });
     }
 
     if (existingVote) {
-      // User has already voted - remove their vote (toggle behavior)
       const { error: deleteVoteError } = await userSupabase
         .from('review_helpful_votes')
         .delete()
@@ -1327,11 +1128,9 @@ app.post('/api/reviews/:reviewId/helpful', authenticateUser, async (req, res) =>
         .eq('user_id', user.id);
 
       if (deleteVoteError) {
-        console.error('Vote deletion error:', deleteVoteError);
         return res.status(400).json({ error: 'ხმის გაუქმება ვერ მოხერხდა' });
       }
 
-      // Decrement the helpful count
       const newHelpfulCount = Math.max(0, (review.helpful_count || 0) - 1);
       
       const { data: updatedReview, error: updateError } = await userSupabase
@@ -1342,7 +1141,6 @@ app.post('/api/reviews/:reviewId/helpful', authenticateUser, async (req, res) =>
         .single();
 
       if (updateError) {
-        console.error('Review update error:', updateError);
         return res.status(400).json({ error: 'შეფასების განახლება ვერ მოხერხდა' });
       }
 
@@ -1354,7 +1152,6 @@ app.post('/api/reviews/:reviewId/helpful', authenticateUser, async (req, res) =>
         user_voted: false
       });
     } else {
-      // User hasn't voted yet - add their vote using authenticated client
       const { error: insertVoteError } = await userSupabase
         .from('review_helpful_votes')
         .insert({
@@ -1363,9 +1160,6 @@ app.post('/api/reviews/:reviewId/helpful', authenticateUser, async (req, res) =>
         });
 
       if (insertVoteError) {
-        console.error('Vote insert error:', insertVoteError);
-        
-        // Check if it's a duplicate key error (race condition)
         if (insertVoteError.code === '23505') {
           return res.status(400).json({ error: 'თქვენ უკვე შეაფასეთ ეს კომენტარი' });
         }
@@ -1373,7 +1167,6 @@ app.post('/api/reviews/:reviewId/helpful', authenticateUser, async (req, res) =>
         return res.status(400).json({ error: 'ხმის რეგისტრაცია ვერ მოხერხდა' });
       }
 
-      // Increment the helpful count
       const newHelpfulCount = (review.helpful_count || 0) + 1;
       
       const { data: updatedReview, error: updateError } = await userSupabase
@@ -1384,9 +1177,6 @@ app.post('/api/reviews/:reviewId/helpful', authenticateUser, async (req, res) =>
         .single();
 
       if (updateError) {
-        console.error('Review update error:', updateError);
-        
-        // Rollback the vote if update fails using authenticated client
         await userSupabase
           .from('review_helpful_votes')
           .delete()
@@ -1405,23 +1195,17 @@ app.post('/api/reviews/:reviewId/helpful', authenticateUser, async (req, res) =>
     }
 
   } catch (err) {
-    console.error('Mark helpful error:', err);
     res.status(500).json({ error: 'სერვერის შეცდომა' });
   }
 });
 
-// New endpoint to get user's vote status for a product's reviews
-// New endpoint to get user's vote status for a product's reviews
 app.get('/api/products/:productId/user-votes', authenticateUser, async (req, res) => {
   try {
     const { productId } = req.params;
     const user = req.user;
 
-    console.log('Fetching user votes for product:', { productId, userId: user.id });
-
-    // ✅ Create authenticated Supabase client with user's token
     const authHeader = req.headers.authorization;
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    const token = authHeader.substring(7);
     
     const userSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: {
@@ -1431,7 +1215,6 @@ app.get('/api/products/:productId/user-votes', authenticateUser, async (req, res
       },
     });
 
-    // Get all reviews for this product that the user has voted on
     const { data: userVotes, error } = await userSupabase
       .from('review_helpful_votes')
       .select(`
@@ -1443,11 +1226,9 @@ app.get('/api/products/:productId/user-votes', authenticateUser, async (req, res
       .eq('reviews.product_id', productId);
 
     if (error) {
-      console.error('Error fetching user votes:', error);
       return res.status(400).json({ error: 'ხმების მოძიება ვერ მოხერხდა' });
     }
 
-    // Create a mapping of reviewId -> true for voted reviews
     const votes = {};
     userVotes.forEach(vote => {
       votes[vote.review_id] = true;
@@ -1459,15 +1240,12 @@ app.get('/api/products/:productId/user-votes', authenticateUser, async (req, res
     });
 
   } catch (err) {
-    console.error('Get user votes error:', err);
     res.status(500).json({ error: 'სერვერის შეცდომა' });
   }
 });
 
-// Serve static files from React's dist folder
 app.use(express.static(path.join(__dirname, '../client/dist')));
 
-// Handle React routing, return all requests to React app
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });

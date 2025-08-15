@@ -1,17 +1,12 @@
 const getApiBaseUrl = () => {
-  // If we're in production (deployed), use relative URLs or the deployed URL
   if (typeof window !== 'undefined') {
-    // In browser
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      // Development - use localhost
       return 'http://localhost:3000';
     } else {
-      // Production - use the same origin (your Render URL)
       return window.location.origin;
     }
   }
   
-  // Fallback for server-side or other contexts
   return process.env.VITE_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:3000';
 };
 
@@ -20,14 +15,9 @@ export const API_BASE_URL = getApiBaseUrl();
 class ApiService {
   constructor() {
     this.API_BASE_URL = API_BASE_URL;
-    console.log('API Service initialized with URL:', this.API_BASE_URL);
   }
 
-
-  // =======================
-  // PRODUCT METHODS
-  // =======================
-
+  // Products
   async fetchProductById(productId) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/products/${productId}`);
@@ -35,13 +25,9 @@ class ApiService {
         throw new Error('Failed to fetch product');
       }
       const product = await response.json();
-      
-      // Parse sizes with improved handling
       product.sizes = this.parseSizes(product.sizes);
-      
       return product;
     } catch (error) {
-      console.error('Error fetching product by ID:', error);
       throw error;
     }
   }
@@ -54,13 +40,11 @@ class ApiService {
       }
       const products = await response.json();
       
-      // Parse sizes for all products
       return products.map(product => ({
         ...product,
         sizes: this.parseSizes(product.sizes)
       }));
     } catch (error) {
-      console.error('Error fetching products:', error);
       throw error;
     }
   }
@@ -73,13 +57,11 @@ class ApiService {
       }
       const products = await response.json();
       
-      // Parse sizes for bestsellers
       return products.map(product => ({
         ...product,
         sizes: this.parseSizes(product.sizes)
       }));
     } catch (error) {
-      console.error('Error fetching bestsellers:', error);
       throw error;
     }
   }
@@ -97,7 +79,6 @@ class ApiService {
       if (filters.types?.length > 0) {
         params.append('types', filters.types.join(','));
       }
-      // Add size filter support
       if (filters.sizes?.length > 0) {
         params.append('sizes', filters.sizes.join(','));
       }
@@ -108,79 +89,60 @@ class ApiService {
       }
       const products = await response.json();
       
-      // Parse sizes for all products
       return products.map(product => ({
         ...product,
         sizes: this.parseSizes(product.sizes)
       }));
     } catch (error) {
-      console.error('Error fetching filtered products:', error);
       throw error;
     }
   }
 
-  // =======================
-  // HELPER METHODS
-  // =======================
-
+  // Utilities
   parseSizes(sizes) {
     if (!sizes) {
-      console.log('No sizes data provided');
       return [];
     }
     
     try {
       let parsedSizes = [];
 
-      // Handle different formats
       if (typeof sizes === 'string') {
-        // First try to parse as JSON
         try {
           parsedSizes = JSON.parse(sizes);
         } catch (jsonError) {
-          console.log('Not valid JSON, trying comma-separated parsing');
-          // If JSON parsing fails, treat as comma-separated string
           parsedSizes = sizes.split(',').map(size => size.trim()).filter(size => size);
         }
       } else if (Array.isArray(sizes)) {
         parsedSizes = sizes;
       } else {
-        console.warn('Unexpected sizes format:', typeof sizes, sizes);
         return [];
       }
 
-      // Ensure we have an array
       if (!Array.isArray(parsedSizes)) {
-        console.warn('parsedSizes is not an array:', parsedSizes);
         return [];
       }
 
-      // Sort sizes numerically
       const sortedSizes = parsedSizes
         .filter(size => size !== null && size !== undefined && size !== '')
         .sort((a, b) => {
           const numA = parseFloat(a);
           const numB = parseFloat(b);
           
-          // If both are valid numbers, sort numerically
           if (!isNaN(numA) && !isNaN(numB)) {
             return numA - numB;
           }
           
-          // If one or both are not numbers, sort alphabetically
           return String(a).localeCompare(String(b));
         });
 
-      console.log('Parsed sizes:', sortedSizes);
       return sortedSizes;
 
     } catch (error) {
-      console.error('Error parsing sizes:', error, 'Original sizes:', sizes);
       return [];
     }
   }
 
-  // Get available sizes across all products (for filters)
   async fetchAvailableSizes() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/products/available-sizes`);
@@ -189,15 +151,11 @@ class ApiService {
       }
       return await response.json();
     } catch (error) {
-      console.error('Error fetching available sizes:', error);
       throw error;
     }
   }
 
-  // =======================
-  // IMAGE METHODS
-  // =======================
-
+  // Images
   async fetchProductImages() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/product-images`);
@@ -206,35 +164,28 @@ class ApiService {
       }
       return await response.json();
     } catch (error) {
-      console.error('Error fetching product images:', error);
       throw error;
     }
   }
 
-  // Add this method to your ApiService class
-async fetchProductImagesByProductId(productId) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/product-images/${productId}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch product images');
+  async fetchProductImagesByProductId(productId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/product-images/${productId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch product images');
+      }
+      return await response.json();
+    } catch (error) {
+      throw error;
     }
-    // The server now returns an array of URLs, so just return it directly
-    return await response.json();
-  } catch (error) {
-    console.error(`Error fetching product images for product ID ${productId}:`, error);
-    throw error;
   }
-}
 
-async getProductById(productId) {
-  return this.fetchProductById(productId);
-}
-
+  async getProductById(productId) {
+    return this.fetchProductById(productId);
+  }
 
   async fetchOfferImages() {
     try {
-      console.log('Making request to:', `${API_BASE_URL}/api/offer-images`);
-      
       const response = await fetch(`${API_BASE_URL}/api/offer-images`, {
         method: 'GET',
         headers: {
@@ -245,31 +196,22 @@ async getProductById(productId) {
       const responseText = await response.text();
 
       if (!response.ok) {
-        console.error('Server error response:', responseText);
         throw new Error(`HTTP ${response.status}: ${response.statusText} - ${responseText.substring(0, 100)}`);
       }
 
-      // Check if response is HTML (error page)
       if (responseText.trim().startsWith('<!doctype') || responseText.trim().startsWith('<html')) {
-        console.error('Received HTML instead of JSON:', responseText.substring(0, 200));
         throw new Error('Server returned HTML instead of JSON. Check if the API endpoint exists.');
       }
 
-      // Try to parse as JSON
       let data;
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
-        console.error('JSON parse error:', parseError);
-        console.error('Response was:', responseText.substring(0, 200));
         throw new Error('Invalid JSON response from server');
       }
       return data;
       
     } catch (error) {
-      console.error('Error in fetchOfferImages:', error);
-      
-      // Network error
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error('Network error - please check your connection and API URL');
       }
@@ -278,10 +220,7 @@ async getProductById(productId) {
     }
   }
 
-  // =======================
-  // FILTER METHODS
-  // =======================
-
+  // Filters
   async fetchFilterOptions() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/filters/options`);
@@ -289,17 +228,13 @@ async getProductById(productId) {
         throw new Error('Failed to fetch filter options');
       }
       const result = await response.json();
-      return result.data; // Return just the data array
+      return result.data;
     } catch (error) {
-      console.error('Error fetching filter options:', error);
       throw error;
     }
   }
 
-  // =======================
-  // AUTHENTICATION METHODS
-  // =======================
-
+  // Authentication
   async signup(userData) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
@@ -318,7 +253,6 @@ async getProductById(productId) {
 
       return data;
     } catch (error) {
-      console.error('Error during signup:', error);
       throw error;
     }
   }
@@ -339,14 +273,12 @@ async getProductById(productId) {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Store session info
       if (data.session) {
         this.setAuthSession(data.session, data.user);
       }
 
       return data.user;
     } catch (error) {
-      console.error('Error during login:', error);
       throw error;
     }
   }
@@ -369,15 +301,12 @@ async getProductById(productId) {
         }
       }
 
-      // Always clear local session regardless of API response
       this.clearAuthData();
       
       return true;
     } catch (error) {
-      console.error('Error during logout:', error);
-      // Still clear local session even if request fails
       this.clearAuthData();
-      return true; // Don't throw error, as logout should always succeed locally
+      return true;
     }
   }
 
@@ -399,7 +328,6 @@ async getProductById(productId) {
       const data = await response.json();
 
       if (!response.ok) {
-        // If token is invalid, clear it
         if (response.status === 401) {
           this.clearAuthData();
         }
@@ -408,7 +336,6 @@ async getProductById(productId) {
 
       return data;
     } catch (error) {
-      console.error('Error getting current user:', error);
       throw error;
     }
   }
@@ -439,7 +366,6 @@ async getProductById(productId) {
 
       return data;
     } catch (error) {
-      console.error('Error getting profile:', error);
       throw error;
     }
   }
@@ -466,7 +392,6 @@ async getProductById(productId) {
         throw new Error(data.error || 'Failed to update profile');
       }
 
-      // Update local user data if successful
       if (data.user) {
         const session = this.getAuthSession();
         if (session) {
@@ -477,15 +402,11 @@ async getProductById(productId) {
 
       return data;
     } catch (error) {
-      console.error('Error updating profile:', error);
       throw error;
     }
   }
 
-  // =======================
-  // PROFILE METHODS
-  // =======================
-
+  // Profile Management
   async getProfileData() {
     try {
       const token = this.getAuthToken();
@@ -512,135 +433,107 @@ async getProductById(productId) {
 
       return data;
     } catch (error) {
-      console.error('Error getting profile data:', error);
       throw error;
     }
   }
 
   async updateProfileData(profileData) {
-  try {
-    const token = this.getAuthToken();
-    if (!token) {
-      throw new Error('No authentication token found');
+    try {
+      const token = this.getAuthToken();
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/profiles/me`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(profileData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update profile data');
+      }
+
+      if (data.user) {
+        const session = this.getAuthSession();
+        if (session) {
+          session.user = data.user;
+          this.setAuthSessionData(session);
+        }
+      }
+
+      return data;
+    } catch (error) {
+      throw error;
     }
+  }
 
-    console.log('Updating profile with data:', profileData);
-
-    const response = await fetch(`${API_BASE_URL}/api/profiles/me`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(profileData),
-    });
-
-    const data = await response.json();
-
-    console.log('Profile update response:', { status: response.status, data });
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to update profile data');
-    }
-
-    // Update local session with new user data
-    if (data.user) {
+  async refreshUserData() {
+    try {
+      const userData = await this.getCurrentUser();
+      
       const session = this.getAuthSession();
       if (session) {
-        session.user = data.user;
+        session.user = userData;
         this.setAuthSessionData(session);
-        console.log('Updated local session with new user data:', data.user);
       }
+      
+      return userData;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  isProfileCompleteForReviews() {
+    const user = this.getCurrentUserFromSession();
+    if (!user) return false;
+    
+    const hasFirstName = !!(user.firstName && user.firstName.trim());
+    const hasLastName = !!(user.lastName && user.lastName.trim());
+    
+    return hasFirstName && hasLastName;
+  }
+
+  canUserLeaveReviews() {
+    if (!this.isAuthenticated()) {
+      return { 
+        canReview: false, 
+        reason: 'not_authenticated',
+        message: 'ავტორიზაცია გაიარეთ'
+      };
     }
 
-    return data;
-  } catch (error) {
-    console.error('Error updating profile data:', error);
-    throw error;
-  }
-}
-
-async refreshUserData() {
-  try {
-    const userData = await this.getCurrentUser();
-    
-    // Update local session
-    const session = this.getAuthSession();
-    if (session) {
-      session.user = userData;
-      this.setAuthSessionData(session);
+    if (!this.isProfileCompleteForReviews()) {
+      return { 
+        canReview: false, 
+        reason: 'incomplete_profile',
+        message: 'შეავსეთ სახელი და გვარი პროფილში'
+      };
     }
-    
-    return userData;
-  } catch (error) {
-    console.error('Error refreshing user data:', error);
-    throw error;
-  }
-}
 
-isProfileCompleteForReviews() {
-  const user = this.getCurrentUserFromSession();
-  if (!user) return false;
-  
-  const hasFirstName = !!(user.firstName && user.firstName.trim());
-  const hasLastName = !!(user.lastName && user.lastName.trim());
-  
-  console.log('Profile completeness check:', {
-    user: user,
-    hasFirstName,
-    hasLastName,
-    complete: hasFirstName && hasLastName
-  });
-  
-  return hasFirstName && hasLastName;
-}
-
-// Enhanced method to check if user can leave reviews
-canUserLeaveReviews() {
-  if (!this.isAuthenticated()) {
-    return { 
-      canReview: false, 
-      reason: 'not_authenticated',
-      message: 'ავტორიზაცია გაიარეთ'
-    };
+    return { canReview: true };
   }
 
-  if (!this.isProfileCompleteForReviews()) {
-    return { 
-      canReview: false, 
-      reason: 'incomplete_profile',
-      message: 'შეავსეთ სახელი და გვარი პროფილში'
-    };
-  }
-
-  return { canReview: true };
-}
-
-  // =======================
-  // OAUTH METHODS
-  // =======================
-
+  // OAuth
   initiateGoogleAuth() {
-    // Redirect to your backend OAuth endpoint, not directly to Supabase
     window.location.href = `${this.API_BASE_URL}/api/auth/google`;
   }
 
   initiateFacebookAuth() {
-    // Redirect to your backend OAuth endpoint, not directly to Supabase
     window.location.href = `${this.API_BASE_URL}/api/auth/facebook`;
   }
 
-  // =======================
-  // HELPER METHODS
-  // =======================
-
+  // Session Management
   getAuthSession() {
     try {
       const session = localStorage.getItem('auth_session');
       return session ? JSON.parse(session) : null;
     } catch (error) {
-      console.error('Error parsing auth session:', error);
-      // Clear corrupted session
       localStorage.removeItem('auth_session');
       return null;
     }
@@ -656,7 +549,7 @@ canUserLeaveReviews() {
       };
       localStorage.setItem('auth_session', JSON.stringify(authSession));
     } catch (error) {
-      console.error('Error setting auth session:', error);
+      // Silent fail
     }
   }
 
@@ -664,7 +557,7 @@ canUserLeaveReviews() {
     try {
       localStorage.setItem('auth_session', JSON.stringify(sessionData));
     } catch (error) {
-      console.error('Error setting auth session data:', error);
+      // Silent fail
     }
   }
 
@@ -679,13 +572,11 @@ canUserLeaveReviews() {
       return false;
     }
     
-    // Check if token is expired
     if (session.expires_at) {
-      const expiryTime = new Date(session.expires_at * 1000); // Convert to milliseconds
+      const expiryTime = new Date(session.expires_at * 1000);
       const now = new Date();
       
       if (expiryTime <= now) {
-        console.log('Token expired, clearing session');
         this.clearAuthData();
         return false;
       }
@@ -694,18 +585,15 @@ canUserLeaveReviews() {
     return true;
   }
 
-  // Get user info from stored session (without API call)
   getCurrentUserFromSession() {
     const session = this.getAuthSession();
     return session?.user || null;
   }
 
-  // Clear all stored authentication data
   clearAuthData() {
     localStorage.removeItem('auth_session');
   }
 
-  // Refresh token if needed
   async refreshAuthToken() {
     const session = this.getAuthSession();
     if (!session?.refresh_token) {
@@ -729,13 +617,10 @@ canUserLeaveReviews() {
         throw new Error(data.error || 'Token refresh failed');
       }
 
-      // Update stored session
       this.setAuthSession(data.session, data.user);
       return data.session;
 
     } catch (error) {
-      console.error('Error refreshing token:', error);
-      // Clear session on refresh failure
       this.clearAuthData();
       throw error;
     }
@@ -759,15 +644,12 @@ canUserLeaveReviews() {
 
       return data;
     } catch (error) {
-      console.error('Error requesting password reset:', error);
       throw error;
     }
   }
 
   async resetPassword(access_token, newPassword) {
     try {
-      console.log('Attempting password reset with token:', access_token ? access_token.substring(0, 10) + '...' : 'MISSING');
-      
       const response = await fetch(`${this.API_BASE_URL}/api/auth/update-password`, {
         method: 'POST',
         headers: {
@@ -782,241 +664,186 @@ canUserLeaveReviews() {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error('Password reset error response:', data);
         throw new Error(data.error || 'Password reset failed');
       }
 
-      console.log('Password reset successful:', data);
       return data;
     } catch (error) {
-      console.error('Error resetting password:', error);
       throw error;
     }
   }
 
+  // Reviews
   async fetchProductReviews(productId) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/products/${productId}/reviews`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch reviews');
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/products/${productId}/reviews`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch reviews');
+      }
+      return await response.json();
+    } catch (error) {
+      throw error;
     }
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching reviews:', error);
-    throw error;
   }
-}
 
-async createReview(reviewData) {
-  try {
-    const token = this.getAuthToken();
-    if (!token) {
-      this.showLoginRequiredMessage('შეფასების დასატოვებლად გთხოვთ ავტორიზაცია გაიაროთ');
-      this.redirectToLogin();
-      return null;
-    }
-
-    console.log('Creating review with data:', reviewData);
-
-    const response = await fetch(`${API_BASE_URL}/api/reviews`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(reviewData),
-    });
-
-    const data = await response.json();
-
-    console.log('Review creation response:', { status: response.status, data });
-
-    if (!response.ok) {
-      // Handle profile incomplete
-      if (data.code === 'PROFILE_INCOMPLETE') {
-        this.handleProfileIncomplete(data.currentProfile);
+  async createReview(reviewData) {
+    try {
+      const token = this.getAuthToken();
+      if (!token) {
+        this.showLoginRequiredMessage('შეფასების დასატოვებლად გთხოვთ ავტორიზაცია გაიაროთ');
+        this.redirectToLogin();
         return null;
       }
-      
-      // Handle profile not found - redirect to login
-      if (data.code === 'PROFILE_NOT_FOUND' || data.requiresLogin) {
-        this.handleProfileNotFound();
-        return null;
+
+      const response = await fetch(`${API_BASE_URL}/api/reviews`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(reviewData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.code === 'PROFILE_INCOMPLETE') {
+          this.handleProfileIncomplete(data.currentProfile);
+          return null;
+        }
+        
+        if (data.code === 'PROFILE_NOT_FOUND' || data.requiresLogin) {
+          this.handleProfileNotFound();
+          return null;
+        }
+        
+        throw new Error(data.error || 'Failed to create review');
       }
-      
-      throw new Error(data.error || 'Failed to create review');
+
+      return data;
+    } catch (error) {
+      throw error;
     }
-
-    return data;
-  } catch (error) {
-    console.error('Error creating review:', error);
-    throw error;
   }
-}
 
-handleProfileIncomplete(currentProfile = null) {
-  let message = 'თქვენი პროფილი არ არის დასრულებული. გთხოვთ შეავსოთ სახელი და გვარი';
-  
-  if (currentProfile) {
-    console.log('Current profile data:', currentProfile);
+  handleProfileIncomplete(currentProfile = null) {
+    let message = 'თქვენი პროფილი არ არის დასრულებული. გთხოვთ შეავსოთ სახელი და გვარი';
     
-    if (!currentProfile.firstName) {
-      message += '\n- სახელი არ არის შევსებული';
+    if (currentProfile) {
+      if (!currentProfile.firstName) {
+        message += '\n- სახელი არ არის შევსებული';
+      }
+      if (!currentProfile.lastName) {
+        message += '\n- გვარი არ არის შევსებული';  
+      }
     }
-    if (!currentProfile.lastName) {
-      message += '\n- გვარი არ არის შევსებული';  
+    
+    if (window.confirm(`${message}\n\nგსურთ პროფილის გვერდზე გადასვლა?`)) {
+      window.location.href = '/profile';
     }
   }
-  
-  if (window.confirm(`${message}\n\nგსურთ პროფილის გვერდზე გადასვლა?`)) {
-    window.location.href = '/profile';
+
+  showLoginRequiredMessage(message) {
+    if (window.showToast) {
+      window.showToast(message, 'warning');
+    } else {
+      alert(message);
+    }
   }
-}
 
-// Update the showLoginRequiredMessage method
-showLoginRequiredMessage(message) {
-  if (window.showToast) {
-    window.showToast(message, 'warning');
-  } else {
-    alert(message);
+  redirectToLogin() {
+    window.location.href = '/login';
   }
-}
 
-// Update redirectToLogin method  
-redirectToLogin() {
-  window.location.href = '/login';
-}
-
-// Helper method to handle profile not found
-handleProfileNotFound() {
-  // Clear any invalid session data
-  this.clearAuthData();
-  
-  // Show user-friendly message
-  this.showLoginRequiredMessage('თქვენი პროფილი არ არის დასრულებული. გთხოვთ ავტორიზაცია გაიაროთ');
-  
-  // Redirect to login after a short delay
-  setTimeout(() => {
-    this.redirectToLogin();
-  }, 2000);
-}
-
-
-async markReviewHelpful(reviewId) {
-  try {
-    const token = this.getAuthToken();
-    if (!token) {
-      this.showLoginRequiredMessage('შეფასების სასარგებლოდ აღნიშვნისთვის გთხოვთ ავტორიზაცია გაიაროთ');
+  handleProfileNotFound() {
+    this.clearAuthData();
+    this.showLoginRequiredMessage('თქვენი პროფილი არ არის დასრულებული. გთხოვთ ავტორიზაცია გაიაროთ');
+    setTimeout(() => {
       this.redirectToLogin();
-      return null;
-    }
+    }, 2000);
+  }
 
-    console.log('Sending helpful request for review:', reviewId);
-
-    const response = await fetch(`${API_BASE_URL}/api/reviews/${reviewId}/helpful`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    const data = await response.json();
-
-    console.log('Helpful response:', { status: response.status, data });
-
-    if (!response.ok) {
-      // Handle profile not found for helpful marking too
-      if (data.code === 'PROFILE_NOT_FOUND' || data.requiresLogin) {
-        this.handleProfileNotFound();
+  async markReviewHelpful(reviewId) {
+    try {
+      const token = this.getAuthToken();
+      if (!token) {
+        this.showLoginRequiredMessage('შეფასების სასარგებლოდ აღნიშვნისთვის გთხოვთ ავტორიზაცია გაიაროთ');
+        this.redirectToLogin();
         return null;
       }
-      
-      // Throw error with server message
-      throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
-    }
 
-    return data;
-  } catch (error) {
-    console.error('Error marking review as helpful:', error);
-    throw error;
+      const response = await fetch(`${API_BASE_URL}/api/reviews/${reviewId}/helpful`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.code === 'PROFILE_NOT_FOUND' || data.requiresLogin) {
+          this.handleProfileNotFound();
+          return null;
+        }
+        
+        throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return data;
+    } catch (error) {
+      throw error;
+    }
   }
-}
 
-// New method to get user's vote status for reviews
-async getUserVoteStatus(productId) {
-  try {
-    const token = this.getAuthToken();
-    if (!token) {
-      return {}; // Return empty object if not authenticated
-    }
+  async getUserVoteStatus(productId) {
+    try {
+      const token = this.getAuthToken();
+      if (!token) {
+        return {};
+      }
 
-    const response = await fetch(`${API_BASE_URL}/api/products/${productId}/user-votes`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+      const response = await fetch(`${API_BASE_URL}/api/products/${productId}/user-votes`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-    if (!response.ok) {
-      console.warn('Failed to fetch user vote status');
+      if (!response.ok) {
+        return {};
+      }
+
+      const data = await response.json();
+      return data.votes || {};
+    } catch (error) {
       return {};
     }
-
-    const data = await response.json();
-    return data.votes || {};
-  } catch (error) {
-    console.error('Error fetching user vote status:', error);
-    return {};
-  }
-}
-
-// Method to check if user should be able to leave reviews
-canUserLeaveReviews() {
-  if (!this.isAuthenticated()) {
-    return { 
-      canReview: false, 
-      reason: 'not_authenticated',
-      message: 'ავტორიზაცია გაიარეთ'
-    };
   }
 
-  const user = this.getCurrentUserFromSession();
-  if (!this.hasCompleteProfile(user)) {
-    return { 
-      canReview: false, 
-      reason: 'incomplete_profile',
-      message: 'შეავსეთ პროფილი'
-    };
-  }
-
-  return { canReview: true };
-}
-
-showReviewPrompt(productId, onReviewSubmitted) {
-  const reviewStatus = this.canUserLeaveReviews();
-  
-  if (!reviewStatus.canReview) {
-    if (reviewStatus.reason === 'not_authenticated') {
-      this.showLoginRequiredMessage('შეფასების დასატოვებლად გთხოვთ ავტორიზაცია გაიაროთ');
-      this.redirectToLogin();
-    } else {
-      this.showLoginRequiredMessage(reviewStatus.message);
+  showReviewPrompt(productId, onReviewSubmitted) {
+    const reviewStatus = this.canUserLeaveReviews();
+    
+    if (!reviewStatus.canReview) {
+      if (reviewStatus.reason === 'not_authenticated') {
+        this.showLoginRequiredMessage('შეფასების დასატოვებლად გთხოვთ ავტორიზაცია გაიაროთ');
+        this.redirectToLogin();
+      } else {
+        this.showLoginRequiredMessage(reviewStatus.message);
+      }
+      return false;
     }
-    return false;
+    
+    if (window.showReviewForm) {
+      window.showReviewForm(productId, onReviewSubmitted);
+    }
+    
+    return true;
   }
-  
-  // If user can review, show the review form
-  // This would trigger your review modal/form
-  if (window.showReviewForm) {
-    window.showReviewForm(productId, onReviewSubmitted);
-  }
-  
-  return true;
-}
 
-  // Get user display name helper
+  // User Helpers
   getUserDisplayName(user = null) {
     const userData = user || this.getCurrentUserFromSession();
     if (!userData) return 'მომხმარებელი';
@@ -1031,7 +858,6 @@ showReviewPrompt(productId, onReviewSubmitted) {
     return 'მომხმარებელი';
   }
 
-  // Check if user has complete profile
   hasCompleteProfile(user = null) {
     const userData = user || this.getCurrentUserFromSession();
     if (!userData) return false;
@@ -1045,20 +871,17 @@ showReviewPrompt(productId, onReviewSubmitted) {
     );
   }
 
-  // Validate email format
   isValidEmail(email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   }
 
-  // Validate phone number format (Georgian)
   isValidPhoneNumber(phone) {
-    if (!phone) return true; // Phone is optional
+    if (!phone) return true;
     const phoneRegex = /^(\+995|995)?[0-9]{9}$/;
     return phoneRegex.test(phone.replace(/\s/g, ''));
   }
 
-  // Format phone number for display
   formatPhoneNumber(phone) {
     if (!phone) return '';
     const cleanPhone = phone.replace(/\D/g, '');
@@ -1073,19 +896,16 @@ showReviewPrompt(productId, onReviewSubmitted) {
     return phone;
   }
 
-  // Format date for display
   formatDate(dateString) {
     if (!dateString) return '';
     try {
       const date = new Date(dateString);
       return date.toLocaleDateString('ka-GE');
     } catch (error) {
-      console.error('Error formatting date:', error);
       return dateString;
     }
   }
 
-  // Get user age from date of birth
   getUserAge(dateOfBirth) {
     if (!dateOfBirth) return null;
     try {
@@ -1100,13 +920,9 @@ showReviewPrompt(productId, onReviewSubmitted) {
       
       return age;
     } catch (error) {
-      console.error('Error calculating age:', error);
       return null;
     }
   }
 }
 
-
-
-// Create and export singleton instance
 export const apiService = new ApiService();
