@@ -16,7 +16,7 @@ const containerStyle = {
   flexDirection: 'column',
   alignItems: 'center',
   width: '100%',
-  maxWidth: '1200px',
+  maxWidth: '1400px',
   margin: '0 auto',
   overflowX: 'hidden',
   padding: '0 1rem',
@@ -95,33 +95,37 @@ const CartPageWithLayout = () => (
 );
 
 const NotFoundPage = () => (
-  <div style={{
-    ...containerStyle,
-    padding: '2rem 1rem',
-    textAlign: 'center',
-    minHeight: '50vh',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center'
-  }}>
-    <h2>გვერდი ვერ მოიძებნა</h2>
-    <p>მოთხოვნილი გვერდი არ არსებობს.</p>
-    <button
-      onClick={() => window.location.href = '/'}
-      style={{
-        padding: '0.75rem 1.5rem',
-        background: '#3b82f6',
-        color: 'white',
-        border: 'none',
-        borderRadius: '0.5rem',
-        cursor: 'pointer',
-        marginTop: '1rem'
-      }}
-    >
-      მთავარ გვერდზე დაბრუნება
-    </button>
-  </div>
+  <>
+    <Header />
+    <div style={{
+      ...containerStyle,
+      padding: '2rem 1rem',
+      textAlign: 'center',
+      minHeight: '50vh',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center'
+    }}>
+      <h2>გვერდი ვერ მოიძებნა</h2>
+      <p>მოთხოვნილი გვერდი არ არსებობს.</p>
+      <button
+        onClick={() => window.location.href = '/'}
+        style={{
+          padding: '0.75rem 1.5rem',
+          background: '#3b82f6',
+          color: 'white',
+          border: 'none',
+          borderRadius: '0.5rem',
+          cursor: 'pointer',
+          marginTop: '1rem'
+        }}
+      >
+        მთავარ გვერდზე დაბრუნება
+      </button>
+    </div>
+    <Footer />
+  </>
 );
 
 const ProductPageWithLayout = ({ allProducts }) => (

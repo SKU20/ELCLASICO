@@ -3,12 +3,12 @@
         }
 
         .filter-container {
+       margin-top: 110px;
   position: relative;
   display: flex;
   align-items: center;
   gap: 1rem;
   max-width: 1600px;
-  margin: 0 auto;
   padding: 2rem 4rem;  /* This might also affect height */
 }
 
